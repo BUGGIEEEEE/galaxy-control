@@ -1,0 +1,13 @@
+.DS_Store
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.py[cod]
+.venv/
+.runtime/
+dist/
+recordings/
+*.log
+local-device.json
+wireless-session.json
+scrcpy-session.json

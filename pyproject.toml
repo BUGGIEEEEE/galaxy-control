@@ -1,0 +1,110 @@
+[project]
+name = "galaxy-control-distribution"
+version = "0.1.0"
+description = "Portable macOS and Samsung Galaxy control skill for Codex"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx2[http2,brotli,zstd]",
+    "pydantic>=2,<3",
+]
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.31",
+    "pytest>=9",
+    "pytest-cov>=7",
+    "ruff>=0.16",
+]
+
+[tool.basedpyright]
+typeCheckingMode = "all"
+pythonVersion = "3.11"
+pythonPlatform = "All"
+include = ["skill/galaxy-control/scripts"]
+exclude = ["**/__pycache__", "**/.venv", "**/build", "**/dist"]
+extraPaths = ["skill/galaxy-control/scripts"]
+reportUnusedCallResult = "warning"
+reportUnnecessaryTypeIgnoreComment = "error"
+reportUnusedVariable = "error"
+reportMissingParameterType = "error"
+reportPrivateUsage = "error"
+reportImplicitOverride = false
+reportUnnecessaryComparison = false
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["skill/galaxy-control/scripts", "tests"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+external = ["V"]
+ignore = [
+    # The formatter intentionally preserves some long commands and error messages.
+    "E501",
+    # Small immutable protocol/value classes are self-describing at the module boundary.
+    "D101",
+    "D102",
+    "D103",
+    "D105",
+    # Stable code/message exceptions are clearer at their guarded branch sites.
+    "EM101",
+    "EM102",
+    "TRY003",
+    "TRY301",
+    # Exhaustive fixed-command match statements intentionally have many explicit branches.
+    "C901",
+    "PLR0911",
+    "PLR0912",
+    "PLR2004",
+    # Exactly three reviewed subprocess boundaries pass argv arrays with shell=False.
+    "S603",
+    # Runtime dataclass/protocol imports stay visible and uniform across script entry points.
+    "TC001",
+    "TC003",
+    "COM812",
+    "CPY001",
+    "D203",
+    "D213",
+    "FBT001",
+    "FBT002",
+    "FIX002",
+    "ISC001",
+    "TD002",
+    "TD003",
+]
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["ARG", "D", "PLR2004", "S101", "SLF001"]
+"skill/galaxy-control/scripts/*.py" = ["INP001", "T201"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+pythonpath = ["skill/galaxy-control/scripts", "scripts"]
+addopts = ["-ra", "--strict-config", "--strict-markers"]
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+source = ["skill/galaxy-control/scripts"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if typing.TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
