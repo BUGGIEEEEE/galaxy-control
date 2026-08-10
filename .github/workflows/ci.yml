@@ -24,7 +24,7 @@ jobs:
       - name: Unit tests
         run: uv run pytest -q
       - name: Ruff
-        run: uv run ruff check --ignore-noqa . && uv run ruff format --check --silent .
+        run: uv run ruff check . && uv run ruff format --check --silent .
       - name: Type check
         run: uv run basedpyright
       - name: Compile
