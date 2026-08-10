@@ -18,7 +18,10 @@ from typing import Final
 MAX_FILE_BYTES: Final = 2_097_152
 MAX_HISTORY_BYTES: Final = 33_554_432
 RULES: Final = (
-    ("absolute_macos_home", re.compile(r"/" r"Users/[^/\s]+")),
+    (
+        "absolute_macos_home",
+        re.compile("".join((r"/", r"Users/[^/\s]+"))),  # noqa: FLY002 -- prevent self-match.
+    ),
     (
         "literal_pairing_code",
         re.compile(

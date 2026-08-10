@@ -35,14 +35,15 @@ Galaxy reboot recovery, root, and generic remote shell execution are outside ver
 
 ## Architecture
 
-1. `galaxy_setup.py` diagnoses the Mac and enrolls one live Galaxy into a private per-user profile.
-2. `galaxy_doctor.py` reports partial availability without changing state.
-3. `openminis_client.py` exposes only reviewed OpenMinis actions against the enrolled literal
+1. `scripts/bootstrap.py` installs only missing `uv` through an existing Homebrew after approval.
+2. `galaxy_setup.py` diagnoses the Mac and enrolls one live Galaxy into a private per-user profile.
+3. `galaxy_doctor.py` reports partial availability without changing state.
+4. `openminis_client.py` exposes only reviewed OpenMinis actions against the enrolled literal
    Tailscale IPv4 address.
-4. `galaxy_remote_adb.py` uses the enrolled identity and fixed profiles for USB, official Wireless
+5. `galaxy_remote_adb.py` uses the enrolled identity and fixed profiles for USB, official Wireless
    Debugging, and optional approved TCP ADB `5555`.
-5. `galaxy_screen.py` starts only fixed scrcpy profiles and stops only its owned process.
-6. `SKILL.md` routes every task through observe, one minimum action, independent verification, and
+6. `galaxy_screen.py` starts only fixed scrcpy profiles and stops only its owned process.
+7. `SKILL.md` routes every task through observe, one minimum action, independent verification, and
    only then the next step.
 
 User identity, device serial, model, Tailscale address, tokens, pairing codes, runtime state,

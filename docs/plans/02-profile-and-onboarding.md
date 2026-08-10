@@ -20,19 +20,21 @@ galaxy_setup.py show-profile
 
 ## Tasks
 
-1. Store the profile under `~/Library/Application Support/galaxy-control/device.json` with directory
+1. Provide a standard-library bootstrap that can diagnose missing `uv` and, after approval, run
+   only an existing Homebrew's exact `brew install uv` command.
+2. Store the profile under `~/Library/Application Support/galaxy-control/device.json` with directory
    mode `0700` and file mode `0600`.
-2. Enroll only an exactly selected, authorized live Galaxy. Prefer a single USB device for first
+3. Enroll only an exactly selected, authorized live Galaxy. Prefer a single USB device for first
    enrollment and require an explicit serial when more than one device exists.
-3. Read physical serial and model using fixed ADB property queries.
-4. Discover the Galaxy Tailscale IPv4 address through a fixed, read-only interface query. Accept
+4. Read physical serial and model using fixed ADB property queries.
+5. Discover the Galaxy Tailscale IPv4 address through a fixed, read-only interface query. Accept
    only a literal address in `100.64.0.0/10`.
-5. Fix the OpenMinis package and default port in code; validate the live bridge before readiness.
-6. Detect Homebrew, `uv`, ADB, scrcpy, Tailscale, Python, Codex desktop, and macOS permission
+6. Fix the OpenMinis package and default port in code; validate the live bridge before readiness.
+7. Detect Homebrew, `uv`, ADB, scrcpy, Tailscale, Python, Codex desktop, and macOS permission
    blockers without changing state.
-7. `plan` emits the exact missing items and intended changes. `apply --approved` may run only the
+8. `plan` emits the exact missing items and intended changes. `apply --approved` may run only the
    reviewed installers listed in source and never updates an already-present tool.
-8. Make setup resumable after user-mediated macOS or Galaxy security prompts.
+9. Make setup resumable after user-mediated macOS or Galaxy security prompts.
 
 ## Tests
 

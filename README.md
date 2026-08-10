@@ -33,7 +33,7 @@ OpenMinis 설치·업데이트·활성화는 이 배포판이 수행하지 않�
 공개 릴리스 태그를 고정해 내려받습니다.
 
 ```sh
-git clone --depth 1 --branch v0.1.0 https://github.com/BUGGIEEEEE/galaxy-control.git
+git clone --depth 1 --branch v0.1.1 https://github.com/BUGGIEEEEE/galaxy-control.git
 cd galaxy-control
 python3 scripts/install_skill.py --approved
 ```
@@ -41,6 +41,16 @@ python3 scripts/install_skill.py --approved
 설치기는 기존 `galaxy-control` 스킬을 덮어쓰지 않습니다. 이미 설치되어 있으면 중단하므로
 기존 스킬의 백업·교체 여부를 사용자가 먼저 결정해야 합니다. 설치 뒤 Codex를 새로 열고
 `$galaxy-control`을 호출합니다.
+
+`uv`가 없는 새 Mac은 저장소 안의 표준 Python 부트스트랩으로 먼저 확인합니다.
+
+```sh
+python3 scripts/bootstrap.py doctor
+python3 scripts/bootstrap.py apply --approved
+```
+
+두 번째 명령은 `uv`가 없고 Homebrew가 있을 때만 정확히 `brew install uv`를 실행합니다.
+Homebrew도 없으면 자동 설치하지 않고 사용자가 Homebrew 또는 uv를 설치하도록 중단합니다.
 
 ## 최초 환경 구성
 

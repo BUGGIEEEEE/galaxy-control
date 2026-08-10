@@ -14,6 +14,17 @@ the user reviews the exact plan and approves it. It never upgrades present tools
 user-mediated install/login because macOS must approve its VPN/system extension. Do not install both
 Mac App Store and standalone variants.
 
+If `uv` is not installed yet, run the repository's standard-library bootstrap before using this
+installed skill:
+
+```sh
+python3 scripts/bootstrap.py doctor
+python3 scripts/bootstrap.py apply --approved
+```
+
+It installs only missing `uv` through an existing Homebrew. If Homebrew is also missing, it stops
+for a user-managed installation instead of downloading or executing a remote installer.
+
 ## Safe sequence
 
 ```sh
