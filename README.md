@@ -33,7 +33,7 @@ OpenMinis 설치·업데이트·활성화는 이 배포판이 수행하지 않�
 공개 릴리스 태그를 고정해 내려받습니다.
 
 ```sh
-git clone --depth 1 --branch v0.1.2 https://github.com/BUGGIEEEEE/galaxy-control.git
+git clone --depth 1 --branch v0.1.3 https://github.com/BUGGIEEEEE/galaxy-control.git
 cd galaxy-control
 python3 scripts/install_skill.py --approved
 ```
