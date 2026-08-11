@@ -47,6 +47,7 @@ def test_entry_scripts_are_executable_and_have_pep723_metadata() -> None:
     # Given
     entries = (
         "galaxy_doctor.py",
+        "galaxy_bridge_package.py",
         "galaxy_remote_adb.py",
         "galaxy_screen.py",
         "galaxy_setup.py",

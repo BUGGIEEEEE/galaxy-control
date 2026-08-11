@@ -1,0 +1,24 @@
+{
+  "typeCheckingMode": "all",
+  "pythonVersion": "3.12",
+  "include": [
+    "skill/galaxy-control/assets/openminis-control-v2/openminis_bridge_control.py",
+    "skill/galaxy-control/assets/openminis-control-v2/openminis_bridge_control_lifecycle.py",
+    "skill/galaxy-control/assets/openminis-control-v2/openminis_bridge_control_process.py",
+    "skill/galaxy-control/assets/openminis-control-v2/openminis_bridge_control_core"
+  ],
+  "executionEnvironments": [
+    {
+      "root": "skill/galaxy-control/assets/openminis-control-v2",
+      "extraPaths": ["skill/galaxy-control/assets/openminis-control-v2"]
+    }
+  ],
+  "reportImplicitRelativeImport": false,
+  "reportUnusedCallResult": "warning",
+  "reportUnnecessaryTypeIgnoreComment": "error",
+  "reportUnusedVariable": "error",
+  "reportMissingParameterType": "error",
+  "reportPrivateUsage": "error",
+  "reportImplicitOverride": false,
+  "reportUnnecessaryComparison": false
+}

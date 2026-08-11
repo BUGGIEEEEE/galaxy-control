@@ -26,8 +26,8 @@ jobs:
       - name: Ruff
         run: uv run ruff check . && uv run ruff format --check --silent .
       - name: Type check
-        run: uv run basedpyright
+        run: uv run basedpyright && uv run basedpyright --project bridge-pyrightconfig.json
       - name: Compile
-        run: python -m compileall -q skill/galaxy-control/scripts scripts
+        run: python -m compileall -q skill/galaxy-control/scripts skill/galaxy-control/assets/openminis-control-v2 scripts
       - name: Privacy scan
         run: python scripts/privacy_scan.py --history
