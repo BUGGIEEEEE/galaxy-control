@@ -5,7 +5,8 @@ Use this guide for first installation, a missing prerequisite, or a new Galaxy.
 ## Supported setup
 
 - macOS and Codex desktop
-- one Samsung Galaxy with a compatible OpenMinis Control v2 bridge already installed
+- one Samsung Galaxy with OpenMinis installed; this distribution can package its compatible Control
+  v2 local bridge separately after enrollment
 - Tailscale signed into the intended tailnet on both devices
 - Android Developer options and official Wireless Debugging when remote scrcpy is required
 
@@ -65,3 +66,8 @@ uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py"
 
 `READY` proves local diagnosed paths, not Computer Use permission or a real end-to-end control. A
 harmless live screen/input/independent-verification pilot is still required for that claim.
+
+If OpenMinis reports `network_error`, continue with
+[openminis-bridge-distribution.md](openminis-bridge-distribution.md). The builder reads the enrolled
+Galaxy Tailscale address and port plus the Mac's current Tailscale address. Do not type those values
+into public source or accept arbitrary replacements on the command line.

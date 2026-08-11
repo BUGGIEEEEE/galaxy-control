@@ -1,6 +1,6 @@
 ---
 name: "galaxy-control"
-description: "Inspect, set up, and safely control an enrolled Samsung Galaxy from Codex on macOS using an existing compatible OpenMinis Control v2 bridge, fixed-profile scrcpy, and reviewed USB or wireless ADB paths. Use for Galaxy setup diagnosis, screen reading, Android navigation, verified UI changes, screen viewing/control/recording, ADB recovery, or independent result verification. Never install, update, activate, or reconcile OpenMinis."
+description: "Inspect, set up, and safely control an enrolled Samsung Galaxy from Codex on macOS using a personalized fixed OpenMinis Control v2 bridge, fixed-profile scrcpy, and reviewed USB or wireless ADB paths. Use for Galaxy setup diagnosis, private bridge packaging, screen reading, Android navigation, verified UI changes, screen viewing/control/recording, ADB recovery, or independent result verification. Never install, update, activate, or reconcile the OpenMinis app."
 ---
 
 # Galaxy Control
@@ -29,8 +29,23 @@ uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_setup.py" plan
 ```
 
 The setup adapter may install only its named missing Mac prerequisites after `--approved`. It does
-not install or update OpenMinis. Tailscale login, macOS privacy dialogs, Galaxy unlock, Wireless
+not install or update the OpenMinis app. Tailscale login, macOS privacy dialogs, Galaxy unlock, Wireless
 Debugging, ADB trust, Accessibility, and Shizuku are user-mediated security steps.
+
+If OpenMinis health on port `43129` returns `network_error`, read
+[openminis-bridge-distribution.md](references/openminis-bridge-distribution.md). Do not copy another
+user's bridge artifact or edit public source IP constants. Build a private artifact from the enrolled
+Galaxy profile and the Mac's current Tailscale identity:
+
+```sh
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_bridge_package.py" doctor
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_bridge_package.py" \
+  build --output /ABSOLUTE/NEW/PRIVATE_DIRECTORY --approved
+```
+
+The build changes only the named Mac output directory. Installing the generated artifact changes
+the Galaxy's local Minis files and requires the user's approval. Follow its exact `INSTALL.md` once,
+then use `LIFECYCLE.md` for fixed `status`, conditional `start`, and `stop` only.
 
 ## Start every Galaxy task
 
@@ -78,7 +93,7 @@ requested outcome.
 
 ## Fixed command surfaces
 
-OpenMinis:
+OpenMinis Mac client:
 
 ```text
 health | shizuku-status | device-info | battery | a11y-status | ui-info | ui-dump
@@ -88,6 +103,14 @@ scroll-xy X Y up|down|left|right DISTANCE
 ```
 
 `input-text` enters text only. Never send, submit, post, or confirm unless the user explicitly asks.
+
+OpenMinis bridge package:
+
+```text
+doctor | build --output ABSOLUTE_NEW_PRIVATE_DIRECTORY --approved
+```
+
+It accepts no host, IP, port, token, shell command, or arbitrary installer option.
 
 scrcpy:
 
@@ -123,7 +146,9 @@ It does not authorize sending, payment, deletion, account changes, security/perm
 pairing, `adb tcpip`, network changes, reboot, app installation/update, or file modification.
 
 Read [autonomy-policy.md](references/autonomy-policy.md) when approval is uncertain. Never install,
-update, activate, repair, or reconcile OpenMinis, and never delete its app data.
+update, activate, repair, or reconcile the OpenMinis app, and never delete its app data. The reviewed
+Control v2 bridge runtime may be installed only from the locally generated content-addressed artifact
+after approval; this is separate from APK installation or app update.
 
 ## Recovery
 

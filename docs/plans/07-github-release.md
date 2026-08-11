@@ -9,11 +9,12 @@ Publish an auditable, immutable installation target after package gates pass.
 1. Keep the GitHub repository private during implementation and security review.
 2. Use atomic commits for plans, profile/onboarding, adapters, skill/docs, and release automation.
 3. Push only after each commit's local gates pass.
-4. Create a signed or annotated `v0.1.0` tag after all package gates pass.
+4. Create a signed or annotated release tag after all package gates pass. Never move an existing tag.
 5. Generate SHA-256 checksums for the release archive and publish release notes that distinguish
    automated verification from real-device pilot verification.
 6. Change the repository to public only after tracked-file and full-history privacy scans pass.
-7. Document the official installer command with repository and tag pinning.
+7. Document the official installer command with repository and tag pinning, plus the locally generated
+   bridge handoff. Never publish a personalized bridge artifact as a GitHub release asset.
 8. Do not claim OpenAI-curated marketplace publication; GitHub is the supported distribution
    channel for this release.
 

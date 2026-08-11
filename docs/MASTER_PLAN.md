@@ -3,7 +3,8 @@
 ## Outcome
 
 Deliver a public, macOS-and-Samsung-Galaxy Codex skill that can diagnose prerequisites, guide or
-apply approved setup, enroll exactly one user's Galaxy, connect through reviewed OpenMinis,
+apply approved setup, enroll exactly one user's Galaxy, package a private reviewed OpenMinis Control
+v2 bridge when the regular app does not expose it, connect through reviewed OpenMinis,
 official Wireless Debugging, optional fixed TCP ADB, and fixed-profile scrcpy paths, then prove a
 real requested result before continuing.
 
@@ -24,7 +25,8 @@ baseline. It must never be edited, installed over, or used as the runtime of thi
 
 - macOS on Apple Silicon or Intel
 - Codex desktop with the required Computer Use capability and macOS permissions
-- Samsung Galaxy with a compatible, already-installed OpenMinis Control v2 bridge
+- Samsung Galaxy with OpenMinis and a Minis local execution/attachment path compatible with the
+  packaged Control v2 bridge
 - Tailscale on both devices
 - Android official Wireless Debugging
 - ADB and scrcpy installed locally or installed after an explicit setup approval
@@ -38,12 +40,14 @@ Galaxy reboot recovery, root, and generic remote shell execution are outside ver
 1. `scripts/bootstrap.py` installs only missing `uv` through an existing Homebrew after approval.
 2. `galaxy_setup.py` diagnoses the Mac and enrolls one live Galaxy into a private per-user profile.
 3. `galaxy_doctor.py` reports partial availability without changing state.
-4. `openminis_client.py` exposes only reviewed OpenMinis actions against the enrolled literal
+4. `galaxy_bridge_package.py` combines reviewed generic runtime assets with the enrolled Galaxy,
+   current Mac Tailscale identity, and fixed Control v2 port into a private content-addressed handoff.
+5. `openminis_client.py` exposes only reviewed OpenMinis actions against the enrolled literal
    Tailscale IPv4 address.
-5. `galaxy_remote_adb.py` uses the enrolled identity and fixed profiles for USB, official Wireless
+6. `galaxy_remote_adb.py` uses the enrolled identity and fixed profiles for USB, official Wireless
    Debugging, and optional approved TCP ADB `5555`.
-6. `galaxy_screen.py` starts only fixed scrcpy profiles and stops only its owned process.
-7. `SKILL.md` routes every task through observe, one minimum action, independent verification, and
+7. `galaxy_screen.py` starts only fixed scrcpy profiles and stops only its owned process.
+8. `SKILL.md` routes every task through observe, one minimum action, independent verification, and
    only then the next step.
 
 User identity, device serial, model, Tailscale address, tokens, pairing codes, runtime state,
@@ -68,12 +72,12 @@ Detailed execution files live in `docs/plans/` and are followed in numeric order
 - Automatic: read-only diagnostics, version checks, live identity reads, profile validation,
   failure classification, and verification.
 - One explicit setup approval: install named Mac prerequisites that are missing, create the private
-  local profile, and perform the exact enrollment actions shown in the plan.
+  local profile, and build the exact private bridge handoff shown in the plan.
 - User-mediated: macOS privacy prompts, Tailscale login/VPN approval, Galaxy unlock, Wireless
   Debugging toggle and pairing-code screen, ADB RSA prompt, Accessibility, and Shizuku permission.
 - Separate explicit approval: pairing, `adb tcpip 5555`, network/security changes, reboot, or
   consequential Galaxy actions.
-- Never: arbitrary host, serial, shell, ADB options, scrcpy options, port scan, pairing-code
+- Never: arbitrary host, serial, bridge IP/port override, shell, ADB options, scrcpy options, port scan, pairing-code
   persistence, token output, root, broad process killing, OpenMinis install/update/reconcile.
 
 ## Completion verdicts

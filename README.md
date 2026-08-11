@@ -19,12 +19,14 @@ Codex + galaxy-control
 - macOS
 - Samsung Galaxy 한 대
 - Codex desktop와 필요한 Computer Use 권한
-- 이미 설치되어 정상 동작하는 호환 OpenMinis Control v2
+- Galaxy에 설치된 OpenMinis와 이 저장소에서 생성하는 OpenMinis Control v2 로컬 브리지
 - Tailscale을 통한 기기 간 연결
 - ADB와 scrcpy
 - Android 공식 Wireless Debugging
 
-OpenMinis 설치·업데이트·활성화는 이 배포판이 수행하지 않습니다. Galaxy 재부팅 후 완전
+OpenMinis 앱이나 APK 설치·업데이트는 이 배포판이 수행하지 않습니다. 대신 일반 OpenMinis
+앱만으로는 제공되지 않는 Control v2 브리지 소스와 개인화 설치 파일 생성기를 포함합니다.
+Galaxy 재부팅 후 완전
 무인 복구도 지원하지 않으며, Android가 요구하는 잠금 해제와 보안 설정은 사용자가 직접
 확인해야 합니다.
 
@@ -33,7 +35,7 @@ OpenMinis 설치·업데이트·활성화는 이 배포판이 수행하지 않�
 공개 릴리스 태그를 고정해 내려받습니다.
 
 ```sh
-git clone --depth 1 --branch v0.1.3 https://github.com/BUGGIEEEEE/galaxy-control.git
+git clone --depth 1 --branch v0.2.0 https://github.com/BUGGIEEEEE/galaxy-control.git
 cd galaxy-control
 python3 scripts/install_skill.py --approved
 ```
@@ -83,12 +85,62 @@ uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py"
 `enroll --serial LIVE_SERIAL --approved`를 사용합니다. 등록 정보는 Git 저장소가 아니라
 사용자 전용 Application Support 파일에 비공개 권한으로 저장됩니다.
 
+## OpenMinis Control v2 브리지 준비
+
+일반 OpenMinis 앱이 설치되어 있어도 포트 `43129`의 Control v2 브리지는 별도로 준비해야
+합니다. 공개 소스 파일의 IP를 직접 수정하지 않습니다. 상대방 Codex가 아래 세 값을 자동으로
+확인해 **그 사용자에게만 맞는 설치 파일**을 Mac에서 생성합니다.
+
+| 값 | 어디서 읽는가 | 어디에 채워지는가 |
+| --- | --- | --- |
+| Galaxy Tailscale IPv4 | `enroll`이 만든 비공개 기기 프로필 | 생성된 설치 파일 → Galaxy의 비공개 `bridge.json` |
+| Mac Tailscale IPv4 | Mac의 `tailscale ip -4` 실시간 결과 | 생성된 설치 파일 → Galaxy의 비공개 `bridge.json` |
+| 포트 | 비공개 프로필의 `openminis_port` | 기본값 `43129`; 생성된 설치 파일과 `bridge.json` |
+
+먼저 값과 공개 브리지 자산을 읽기 전용으로 검사합니다.
+
+```sh
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_bridge_package.py" doctor
+```
+
+`READY`이면 비어 있는 절대 경로 하나를 골라 개인화 인계 묶음을 만듭니다.
+
+```sh
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_bridge_package.py" \
+  build --output "$HOME/Desktop/openminis-control-v2-handoff" --approved
+```
+
+생성 폴더에는 다음 네 종류만 있습니다.
+
+- `openminis-control-v2-<SHA256>.py`: 해당 Galaxy/Mac 조합 전용 설치 파일
+- `INSTALL.md`: Minis에게 파일을 첨부한 뒤 정확히 한 번 실행시킬 지시문
+- `LIFECYCLE.md`: `status`, `start`, `stop` 고정 명령
+- `SHA256SUMS`: 설치 파일과 포함된 런타임 manifest 확인값
+
+상대방 Codex는 `INSTALL.md`대로 설치한 뒤 `LIFECYCLE.md`의 `status`를 확인하고, Mac에서
+다음을 실행해 실제 연결을 검증합니다.
+
+```sh
+"$GALAXY_SKILL_ROOT/scripts/galaxy_control.sh" health
+"$GALAXY_SKILL_ROOT/scripts/galaxy_control.sh" a11y-status
+"$GALAXY_SKILL_ROOT/scripts/galaxy_control.sh" ui-info
+```
+
+개인화 설치 파일에는 두 Tailscale 주소가 들어 있으므로 GitHub, 메신저, 공개 이슈에 올리지
+않고 대상 Galaxy의 Minis에만 전달합니다. 토큰은 Galaxy에서 설치할 때 새로 생성되며 출력되지
+않습니다. 자세한 실패 처리와 원복은
+[OpenMinis 브리지 배포 안내](skill/galaxy-control/references/openminis-bridge-distribution.md)를
+따릅니다.
+
 ## 주요 인터페이스
 
 ```sh
 # OpenMinis
 "$GALAXY_SKILL_ROOT/scripts/galaxy_control.sh" health
 "$GALAXY_SKILL_ROOT/scripts/galaxy_control.sh" ui-info
+
+# 사용자별 OpenMinis Control v2 브리지 패키지
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_bridge_package.py" doctor
 
 # scrcpy
 uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_screen.py" view
@@ -105,7 +157,8 @@ uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_remote_adb.py" wireless-status
 
 ## 배포 완성도
 
-- 자동 테스트와 정적·프라이버시 검사를 통과한 릴리스: `PACKAGE_READY`
+- 자동 테스트와 정적·프라이버시 검사 및 일반화 브리지 패키지 검증을 통과한 릴리스:
+  `PACKAGE_READY`
 - 새로운 사용자의 깨끗한 Mac 설치 확인: `PILOT_INSTALL_VERIFIED`
 - 새로운 사용자의 실제 화면·입력·독립 검증까지 확인: `PILOT_E2E_VERIFIED`
 - 위 검증과 공개 태그·체크섬까지 모두 확인: `DISTRIBUTION_READY`

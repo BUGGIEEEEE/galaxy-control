@@ -15,12 +15,28 @@
 
 - 기기 serial, 모델, Tailscale 주소는 공개 코드가 아니라 사용자 전용 `0600` 프로필에
   저장됩니다.
-- OpenMinis 토큰이 필요한 호환 환경에서는 프로세스 환경에서만 읽고 출력하지 않습니다.
+- 공개 저장소에는 Galaxy/Mac Tailscale 주소나 OpenMinis 토큰을 넣지 않습니다.
+- 개인화 설치 파일은 등록 프로필과 Mac의 현재 Tailscale 주소를 자동으로 넣으므로 `0600`
+  파일로 생성되며 대상 Galaxy의 Minis에만 전달해야 합니다.
+- OpenMinis Control v2 토큰은 Galaxy에서 설치할 때 생성되고 `0600` 파일로만 저장되며,
+  설치 결과·명령행·로그에 출력하지 않습니다.
 - Wireless Debugging pairing code는 stdin에서 한 번만 읽으며 argv, 환경, 파일, JSON, 로그에
   저장하지 않습니다.
 - ADB와 scrcpy는 검토된 argv 배열과 `shell=False`만 사용합니다.
 - scrcpy는 저장된 전체 프로세스 신원이 맞는 경우에만 해당 PID를 종료합니다.
 - OpenMinis 설치·업데이트·활성화·reconcile과 범용 원격 셸은 제공하지 않습니다.
+
+## Personalized bridge handoff
+
+공개 브리지 런타임은 개인 주소를 포함하지 않습니다. `galaxy_bridge_package.py build`가 다음
+검증된 값만 개인화 설치 파일에 넣습니다.
+
+- 등록된 Galaxy 프로필의 Tailscale IPv4와 OpenMinis 포트
+- Mac에서 정확히 하나만 확인된 별도의 Tailscale IPv4
+
+임의 host, IP, 포트, 셸 인자를 받지 않으며 출력 폴더는 기존 경로를 덮어쓰지 않습니다.
+생성된 설치 파일은 Git 추적 대상이 아니며 공개 배포물이 아닙니다. 설치 파일은 내용 기반
+SHA-256 이름을 사용하고, Minis에서는 `INSTALL.md`의 sealed-memory 실행기만 한 번 사용합니다.
 
 ## Fixed TCP ADB warning
 
