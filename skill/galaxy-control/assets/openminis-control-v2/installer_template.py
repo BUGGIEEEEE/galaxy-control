@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Final
 
-VERSION: Final = "0.2.0"
+VERSION: Final = "0.2.1"
 PHONE_IPV4: Final = "__PHONE_IPV4__"
 TRUSTED_MAC_IPV4: Final = "__TRUSTED_MAC_IPV4__"
 PORT: Final = int("__PORT__")

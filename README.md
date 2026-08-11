@@ -35,7 +35,7 @@ Galaxy 재부팅 후 완전
 공개 릴리스 태그를 고정해 내려받습니다.
 
 ```sh
-git clone --depth 1 --branch v0.2.0 https://github.com/BUGGIEEEEE/galaxy-control.git
+git clone --depth 1 --branch v0.2.1 https://github.com/BUGGIEEEEE/galaxy-control.git
 cd galaxy-control
 python3 scripts/install_skill.py --approved
 ```
@@ -43,6 +43,26 @@ python3 scripts/install_skill.py --approved
 설치기는 기존 `galaxy-control` 스킬을 덮어쓰지 않습니다. 이미 설치되어 있으면 중단하므로
 기존 스킬의 백업·교체 여부를 사용자가 먼저 결정해야 합니다. 설치 뒤 Codex를 새로 열고
 `$galaxy-control`을 호출합니다.
+
+### 이미 v0.1.x 스킬이 설치된 사용자
+
+기존 스킬을 삭제·이동·덮어쓰지 않아도 브리지 준비를 먼저 진행할 수 있습니다. `v0.2.1`
+저장소를 별도 폴더에 내려받고, 아래처럼 **체크아웃 안의 배포용 스킬 경로**를 사용합니다.
+
+```sh
+git clone --depth 1 --branch v0.2.1 https://github.com/BUGGIEEEEE/galaxy-control.git galaxy-control-v0.2.1
+cd galaxy-control-v0.2.1
+BRIDGE_RELEASE_ROOT="$PWD/skill/galaxy-control"
+
+uv run "$BRIDGE_RELEASE_ROOT/scripts/galaxy_bridge_package.py" doctor
+uv run "$BRIDGE_RELEASE_ROOT/scripts/galaxy_bridge_package.py" \
+  build --output "$HOME/Desktop/openminis-control-v2-handoff" --approved
+```
+
+이 명령은 기존에 설치된 `~/.codex/skills/galaxy-control`을 수정하지 않습니다. 등록 프로필은
+기존 Application Support 위치에서 읽고, 새 개인화 인계 폴더만 만듭니다. 브리지 E2E 확인 후
+스킬 자체를 `v0.2.1`로 교체할지는 별도 작업으로 결정하세요. 설치기는 의도적으로 자동
+업그레이드하지 않습니다.
 
 `uv`가 없는 새 Mac은 저장소 안의 표준 Python 부트스트랩으로 먼저 확인합니다.
 
