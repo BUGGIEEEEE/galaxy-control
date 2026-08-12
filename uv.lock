@@ -343,7 +343,7 @@ toml = [
 
 [[package]]
 name = "galaxy-control-distribution"
-version = "0.3.0"
+version = "0.3.1"
 source = { virtual = "." }
 dependencies = [
     { name = "httpx2", extra = ["brotli", "http2", "zstd"] },

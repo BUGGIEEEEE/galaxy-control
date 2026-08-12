@@ -53,7 +53,7 @@ Galaxy 재부팅 후 완전
 공개 릴리스 태그를 고정해 내려받습니다.
 
 ```sh
-git clone --depth 1 --branch v0.3.0 https://github.com/BUGGIEEEEE/galaxy-control.git
+git clone --depth 1 --branch v0.3.1 https://github.com/BUGGIEEEEE/galaxy-control.git
 cd galaxy-control
 python3 scripts/install_skill.py --approved
 ```
@@ -64,12 +64,12 @@ python3 scripts/install_skill.py --approved
 
 ### 이미 v0.1.x 스킬이 설치된 사용자
 
-기존 스킬을 삭제·이동·덮어쓰지 않아도 브리지 준비를 먼저 진행할 수 있습니다. `v0.3.0`
+기존 스킬을 삭제·이동·덮어쓰지 않아도 브리지 준비를 먼저 진행할 수 있습니다. `v0.3.1`
 저장소를 별도 폴더에 내려받고, 아래처럼 **체크아웃 안의 배포용 스킬 경로**를 사용합니다.
 
 ```sh
-git clone --depth 1 --branch v0.3.0 https://github.com/BUGGIEEEEE/galaxy-control.git galaxy-control-v0.3.0
-cd galaxy-control-v0.3.0
+git clone --depth 1 --branch v0.3.1 https://github.com/BUGGIEEEEE/galaxy-control.git galaxy-control-v0.3.1
+cd galaxy-control-v0.3.1
 BRIDGE_RELEASE_ROOT="$PWD/skill/galaxy-control"
 
 uv run "$BRIDGE_RELEASE_ROOT/scripts/galaxy_bridge_package.py" doctor
@@ -79,7 +79,7 @@ uv run "$BRIDGE_RELEASE_ROOT/scripts/galaxy_bridge_package.py" \
 
 이 명령은 기존에 설치된 `~/.codex/skills/galaxy-control`을 수정하지 않습니다. 등록 프로필은
 기존 Application Support 위치에서 읽고, 새 개인화 인계 폴더만 만듭니다. 브리지 E2E 확인 후
-스킬 자체를 `v0.3.0`으로 교체할지는 별도 작업으로 결정하세요. 설치기는 의도적으로 자동
+스킬 자체를 `v0.3.1`로 교체할지는 별도 작업으로 결정하세요. 설치기는 의도적으로 자동
 업그레이드하지 않습니다.
 
 `uv`가 없는 새 Mac은 저장소 안의 표준 Python 부트스트랩으로 먼저 확인합니다.
@@ -173,8 +173,10 @@ uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_bridge_package.py" \
 ## One UI 앱 서랍·폴더 작업
 
 One UI의 폴더 선택기 한 곳만 읽으면 전체 앱 목록이 아닐 수 있습니다. 현재 폴더에 이미 든
-앱이 그 선택기에서 숨겨질 수 있기 때문입니다. 이 릴리스는 휴대전화를 자동 조작하지 않는
-두 가지 로컬 검증기를 제공합니다.
+앱이 그 선택기에서 숨겨질 수 있기 때문입니다. 이 릴리스는 Galaxy를 조작하지 않고 저장된
+자료만 검사하는 두 가지 로컬 검증기를 제공합니다. `replay`와 `union`은 사용자가 지정한
+새 Mac 출력 디렉터리만 만들며, `check`는 입력 TSV만 읽습니다. Mac 파일도 쓰면 안 되는
+요청에서는 `replay`와 `union`을 실행하지 않습니다.
 
 ```sh
 # 저장된 ui-dump JSONL을 읽어 한 선택기의 겹치는 구간을 재생

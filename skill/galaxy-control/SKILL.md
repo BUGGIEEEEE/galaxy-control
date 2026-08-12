@@ -83,7 +83,8 @@ For Samsung One UI app-drawer inventory, folder creation, or app moves, read bot
 [oneui-folder-picker.md](references/oneui-folder-picker.md) before acting. A single folder picker is
 not a complete app inventory, a selected-count label proves quantity but not app identity, and every
 layout coordinate becomes stale after a launcher change. Use the local artifact checkers below to
-validate saved evidence; they never select, move, or otherwise control the phone.
+validate saved evidence; they never select, move, or otherwise control the phone. `replay` and
+`union` write only their explicitly named new Mac output directory, while `check` writes nothing.
 
 ## Apply the verification loop
 
@@ -131,7 +132,7 @@ record --output ABSOLUTE_NEW_MP4_OR_MKV [--serial LIVE_SERIAL] | stop
 
 Read [scrcpy-policy.md](references/scrcpy-policy.md) before `control`, `record`, or `stop`.
 
-Saved One UI evidence (local and read-only):
+Saved One UI evidence (phone-read-only local artifact profiles):
 
 ```text
 oneui_inventory.py replay --input ABSOLUTE_JSONL --output ABSOLUTE_NEW_DIRECTORY \
@@ -142,8 +143,10 @@ oneui_ledger.py check --manifest ABSOLUTE_TSV --ledger ABSOLUTE_TSV \
   --progress ABSOLUTE_TSV --selected-count N
 ```
 
-These profiles read saved dumps and TSV files only. They expose no OpenMinis, ADB, scrcpy, shell,
-selection, or completion action.
+These profiles expose no OpenMinis, ADB, scrcpy, shell, selection, or completion action. `replay`
+and `union` create only the named new local output directory; do not run them when the user forbids
+all Mac file writes. A successful artifact check proves internal consistency, not current Galaxy
+state, unless the referenced observations were independently captured and verified.
 
 ADB:
 

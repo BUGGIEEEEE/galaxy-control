@@ -15,6 +15,11 @@ omitted, so one picker must never be reported as the complete installed-app inve
 6. If the sessions differ, windows do not overlap, or a saved dump contains a selected state, stop
    instead of filling the gap by inference.
 
+`--capture-session` is an operator-supplied provenance label. Create it once at capture start from
+the freshly observed boot session plus a new capture-batch identifier, preserve that evidence beside
+the JSONL, and never reuse it. The checker proves that supplied labels agree; it cannot prove by
+itself that two dumps were physically captured at the same time.
+
 The maximum-occurrence rule preserves duplicate visible names while accounting for items omitted by
 one source folder. It does not prove package identity. Use a reviewed package or component query when
 one of several same-name apps must be distinguished.
@@ -50,6 +55,9 @@ After the move, verify destination presence, source absence, and expected count,
 progress row immediately. Use `oneui_ledger.py check` to verify manifest, selection ledger, selected
 count, and progress evidence. The checker is local and read-only; it never clicks a row or `Done`.
 
+Here, read-only means device-read-only. Inventory `replay` and `union` create only the explicitly
+named new Mac output directory. The ledger `check` profile does not write output files.
+
 The three TSV files use these exact tab-separated headers:
 
 ```text
@@ -59,3 +67,8 @@ progress.tsv: item_id  app_name  target_folder  status  destination_present  sou
 ```
 
 `status` is `completed`, `pending`, or `held`; proof flags are lowercase `true` or `false`.
+
+`--selected-count` must come from a fresh saved picker observation. The progress proof flags must
+come from preserved destination, source, and count observations. The checker validates their
+internal agreement; it does not reread the Galaxy or authenticate those external observations.
+Therefore checker success alone is not proof that an app move occurred.
