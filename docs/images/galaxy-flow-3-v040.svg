@@ -1,0 +1,166 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="940" viewBox="0 0 1400 940" role="img" aria-labelledby="title desc">
+  <title id="title">Galaxy Control v0.4.0 Codex와 사용자 역할 구분</title>
+  <desc id="desc">Codex가 자동으로 읽고 판단하는 단계, 명시적 승인 후 수행하는 단계, 사용자가 보안 화면에서 직접 조작하는 단계를 구분하고 선택적 사전검사와 세션 내 재사용 정책을 설명</desc>
+  <defs>
+    <style>
+      text { font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; fill: #293044; }
+      .eyebrow { font: 700 14px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 1px; fill: #536078; }
+      .title { font-size: 48px; font-weight: 760; letter-spacing: -2px; }
+      .subtitle { font-size: 17px; font-weight: 550; fill: #536078; }
+      .section { font: 700 12px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .8px; fill: #6a7488; }
+      .row-title { font-size: 21px; font-weight: 780; }
+      .card-title { font-size: 17px; font-weight: 760; }
+      .body { font-size: 14px; font-weight: 540; fill: #4f5a70; }
+      .small { font-size: 12.5px; font-weight: 550; fill: #617087; }
+      .pill { font-size: 12px; font-weight: 780; }
+      .blue { fill: #2859bd; }
+      .orange { fill: #e9582c; }
+      .green { fill: #197052; }
+      .white { fill: #fff !important; }
+      .line { fill: none; stroke: #364157; stroke-width: 1.8; }
+      .dash { stroke-dasharray: 7 6; }
+    </style>
+  </defs>
+  <rect width="1400" height="940" fill="#fbfcfe"/>
+  <rect x="1" y="1" width="1398" height="938" fill="none" stroke="#c7cfdb"/>
+  <text x="42" y="46" class="eyebrow">03 / RESPONSIBILITY MAP · v0.4.0</text>
+  <text x="42" y="98" class="title">Codex와 사용자의 역할 구분</text>
+  <text x="922" y="48" class="subtitle">“사용자 승인”과 “사용자 직접 조작”은 다릅니다.</text>
+  <text x="922" y="76" class="subtitle">승인된 명령은 Codex가 실행하고 보안 화면은 사용자가 조작합니다.</text>
+
+  <rect x="38" y="132" width="1324" height="680" fill="#f5f7fa" stroke="#c7cfdb"/>
+  <text x="250" y="166" class="section">CLASSIFY / PREFLIGHT</text>
+  <text x="480" y="166" class="section">MAC TOOLS</text>
+  <text x="720" y="166" class="section">GALAXY SECURITY</text>
+  <text x="950" y="166" class="section">ENROLL / CONNECT</text>
+  <text x="1182" y="166" class="section">VERIFY</text>
+
+  <rect x="64" y="184" width="1272" height="176" rx="8" fill="#fff" stroke="#ced5df"/>
+  <rect x="82" y="204" width="152" height="136" rx="7" fill="#f4f7ff" stroke="#2859bd" stroke-width="1.8"/>
+  <rect x="102" y="220" width="74" height="24" rx="12" fill="#2859bd"/>
+  <text x="139" y="237" class="pill white" text-anchor="middle">CODEX</text>
+  <text x="158" y="274" class="row-title" text-anchor="middle">자동·읽기</text>
+  <text x="158" y="302" class="body" text-anchor="middle">변경 없음</text>
+  <text x="158" y="326" class="small" text-anchor="middle">안전 진단</text>
+
+  <rect x="250" y="204" width="210" height="136" rx="7" fill="#fff" stroke="#364157" stroke-width="1.6"/>
+  <text x="274" y="232" class="pill blue">자동</text>
+  <text x="274" y="263" class="card-title">작업 분류 · 선택 검사</text>
+  <text x="274" y="291" class="body">openminis / adb / scrcpy</text>
+  <text x="274" y="316" class="small">필요한 경로만 검사</text>
+
+  <rect x="480" y="204" width="210" height="136" rx="7" fill="#fff" stroke="#364157" stroke-width="1.6"/>
+  <text x="504" y="232" class="pill blue">자동</text>
+  <text x="504" y="263" class="card-title">설치·연결 상태 읽기</text>
+  <text x="504" y="291" class="body">Homebrew · ADB · scrcpy</text>
+  <text x="504" y="316" class="small">기존 도구는 업데이트하지 않음</text>
+
+  <rect x="710" y="204" width="210" height="136" rx="7" fill="#fff" stroke="#364157" stroke-width="1.6"/>
+  <text x="734" y="232" class="pill blue">자동</text>
+  <text x="734" y="263" class="card-title">Galaxy 상태만 읽기</text>
+  <text x="734" y="291" class="body">ADB device · Tailscale · a11y</text>
+  <text x="734" y="316" class="small">권한 변경 없이 진단</text>
+
+  <rect x="940" y="204" width="210" height="136" rx="7" fill="#fff" stroke="#364157" stroke-width="1.6"/>
+  <text x="964" y="232" class="pill blue">자동</text>
+  <text x="964" y="263" class="card-title">고정 신원 비교</text>
+  <text x="964" y="291" class="body">USB · serial · model · tunnel</text>
+  <text x="964" y="316" class="small">불일치·다중 후보는 중단</text>
+
+  <rect x="1170" y="204" width="148" height="136" rx="7" fill="#f1faf6" stroke="#197052" stroke-width="1.8"/>
+  <text x="1192" y="232" class="pill green">자동 검증</text>
+  <text x="1192" y="263" class="card-title">새 상태 읽기</text>
+  <text x="1192" y="291" class="body">result.route</text>
+  <text x="1192" y="316" class="small">경로·결과 확인</text>
+
+  <rect x="64" y="380" width="1272" height="170" rx="8" fill="#f8f9fb" stroke="#ced5df"/>
+  <rect x="82" y="400" width="152" height="130" rx="7" fill="#fff" stroke="#364157" stroke-width="1.6" stroke-dasharray="7 6"/>
+  <rect x="102" y="416" width="74" height="24" rx="12" fill="#364157"/>
+  <text x="139" y="433" class="pill white" text-anchor="middle">CODEX</text>
+  <text x="158" y="470" class="row-title" text-anchor="middle">승인 후</text>
+  <text x="158" y="498" class="body" text-anchor="middle">상태 변경</text>
+  <text x="158" y="522" class="small" text-anchor="middle">범위 제한</text>
+
+  <rect x="250" y="400" width="210" height="130" rx="7" fill="#fff" stroke="#364157" stroke-width="1.6" stroke-dasharray="7 6"/>
+  <text x="274" y="430" class="pill orange">승인 후</text>
+  <text x="274" y="461" class="card-title">세션 결과 재사용</text>
+  <text x="274" y="489" class="body">현재 agent memory에만 유지</text>
+  <text x="274" y="514" class="small">오류·재부팅·망 변경 시 폐기</text>
+
+  <rect x="480" y="400" width="210" height="130" rx="7" fill="#fff" stroke="#364157" stroke-width="1.6" stroke-dasharray="7 6"/>
+  <text x="504" y="430" class="pill orange">승인 후</text>
+  <text x="504" y="461" class="card-title">빠진 도구만 설치</text>
+  <text x="504" y="489" class="body">기존 Homebrew만 사용</text>
+  <text x="504" y="514" class="small">정확한 명령·영향 사전 고지</text>
+
+  <rect x="710" y="400" width="210" height="130" rx="7" fill="#fff" stroke="#364157" stroke-width="1.6" stroke-dasharray="7 6"/>
+  <text x="734" y="430" class="pill orange">승인 후</text>
+  <text x="734" y="461" class="card-title">최소 요청 조작</text>
+  <text x="734" y="489" class="body">OpenMinis 또는 scrcpy</text>
+  <text x="734" y="514" class="small">불확실하면 반복하지 않음</text>
+
+  <rect x="940" y="400" width="210" height="130" rx="7" fill="#fff" stroke="#364157" stroke-width="1.6" stroke-dasharray="7 6"/>
+  <text x="964" y="430" class="pill orange">승인 후</text>
+  <text x="964" y="461" class="card-title">등록 · bridge · 연결</text>
+  <text x="964" y="489" class="body">private profile · handoff</text>
+  <text x="964" y="514" class="small">고정 pair/connect profile</text>
+
+  <rect x="1170" y="400" width="148" height="130" rx="7" fill="#fff" stroke="#364157" stroke-width="1.6" stroke-dasharray="7 6"/>
+  <text x="1192" y="430" class="pill orange">승인 후</text>
+  <text x="1192" y="461" class="card-title">복원 조작</text>
+  <text x="1192" y="489" class="body">테스트 상태</text>
+  <text x="1192" y="514" class="small">필요 시 원복</text>
+
+  <rect x="64" y="570" width="1272" height="214" rx="8" fill="#fff8f4" stroke="#efc7b9"/>
+  <rect x="82" y="590" width="152" height="174" rx="7" fill="#fff8f4" stroke="#e9582c" stroke-width="1.8"/>
+  <rect x="102" y="606" width="74" height="24" rx="12" fill="#e9582c"/>
+  <text x="139" y="623" class="pill white" text-anchor="middle">사용자</text>
+  <text x="158" y="662" class="row-title" text-anchor="middle">직접 조작</text>
+  <text x="158" y="692" class="body" text-anchor="middle">보안 화면</text>
+  <text x="158" y="718" class="body" text-anchor="middle">기기 물리 조작</text>
+  <text x="158" y="745" class="small" text-anchor="middle">Codex 대체 불가</text>
+
+  <rect x="250" y="590" width="210" height="174" rx="7" fill="#fff" stroke="#e9582c" stroke-width="1.6"/>
+  <text x="274" y="620" class="pill orange">필요 시</text>
+  <text x="274" y="653" class="card-title">Homebrew 설치</text>
+  <text x="274" y="681" class="body">없는 경우에만</text>
+  <text x="274" y="706" class="body">GitHub 문서 확인</text>
+
+  <rect x="480" y="590" width="210" height="174" rx="7" fill="#fff" stroke="#e9582c" stroke-width="1.6"/>
+  <text x="504" y="620" class="pill orange">macOS 화면</text>
+  <text x="504" y="653" class="card-title">권한 팝업 승인</text>
+  <text x="504" y="681" class="body">Computer Use · 화면 기록</text>
+  <text x="504" y="706" class="body">시스템 설정 직접 조작</text>
+
+  <rect x="710" y="590" width="210" height="174" rx="7" fill="#fff" stroke="#e9582c" stroke-width="1.6"/>
+  <text x="734" y="620" class="pill orange">Galaxy 화면</text>
+  <text x="734" y="653" class="card-title">보안 준비</text>
+  <text x="734" y="681" class="body">잠금 해제 · USB RSA</text>
+  <text x="734" y="706" class="body">Tailscale · 무선 디버깅</text>
+  <text x="734" y="731" class="small">Shizuku 권한 포함</text>
+
+  <rect x="940" y="590" width="210" height="174" rx="7" fill="#fff" stroke="#e9582c" stroke-width="1.6"/>
+  <text x="964" y="620" class="pill orange">Galaxy Minis</text>
+  <text x="964" y="653" class="card-title">bridge 1회 적용</text>
+  <text x="964" y="681" class="body">개인화 파일 첨부</text>
+  <text x="964" y="706" class="body">INSTALL.md 정확히 실행</text>
+  <text x="964" y="731" class="small">network_error일 때만</text>
+
+  <rect x="1170" y="590" width="148" height="174" rx="7" fill="#fff" stroke="#e9582c" stroke-width="1.6"/>
+  <text x="1192" y="620" class="pill orange">현재값</text>
+  <text x="1192" y="653" class="card-title">두 포트</text>
+  <text x="1192" y="681" class="body">pair / connect</text>
+  <text x="1192" y="706" class="body">6자리 stdin</text>
+  <text x="1192" y="731" class="small">채팅 기록 금지</text>
+
+  <rect x="38" y="832" width="1324" height="78" fill="#fff"/>
+  <rect x="38" y="832" width="440" height="78" fill="#f4f7ff" stroke="#c7cfdb"/>
+  <text x="64" y="860" class="card-title">Codex가 자동으로 할 수 있음</text>
+  <text x="64" y="886" class="small">분류 · 읽기 전용 preflight · 고정 신원 확인 · 새 상태 검증</text>
+  <rect x="478" y="832" width="442" height="78" fill="#f8f9fb" stroke="#c7cfdb"/>
+  <text x="504" y="860" class="card-title">승인하면 Codex가 실행</text>
+  <text x="504" y="886" class="small">누락 도구 · 등록 · 연결 · 최소 조작 · 조건부 bridge 생성</text>
+  <rect x="920" y="832" width="442" height="78" fill="#fff8f4" stroke="#c7cfdb"/>
+  <text x="946" y="860" class="card-title">사용자가 직접 해야 함</text>
+  <text x="946" y="886" class="small">보안 화면 · 물리 연결 · VPN/ADB 승인 · pairing code 입력</text>
+</svg>

@@ -74,15 +74,18 @@ def test_readme_embeds_all_privacy_clean_flow_diagrams() -> None:
     # Given
     content = (REPOSITORY_ROOT / "README.md").read_text()
     expected = {
-        "docs/images/galaxy-flow-1.png",
-        "docs/images/galaxy-flow-2.png",
-        "docs/images/galaxy-flow-3.png",
+        "docs/images/galaxy-flow-1-v040.svg",
+        "docs/images/galaxy-flow-2-v040.svg",
+        "docs/images/galaxy-flow-3-v040.svg",
     }
 
     # When
-    linked = set(re.findall(r"!\[[^]]+\]\((docs/images/galaxy-flow-[123]\.png)\)", content))
+    linked = set(re.findall(r"!\[[^]]+\]\((docs/images/galaxy-flow-[123]-v040\.svg)\)", content))
 
     # Then
     assert linked == expected
     for relative in linked:
-        assert (REPOSITORY_ROOT / relative).read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+        diagram = (REPOSITORY_ROOT / relative).read_text()
+        assert diagram.startswith("<svg ")
+        assert "<title " in diagram
+        assert "<desc " in diagram

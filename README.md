@@ -7,30 +7,33 @@ macOS의 Codex가 Samsung Galaxy를 **관찰 → 최소 조작 → 독립 검증
 사용자 요청
    ↓
 Codex + galaxy-control
+   ├─ 작업 유형 판단 → 관련 경로만 사전검사
    ├─ OpenMinis ─ 의미·글자·버튼 관찰과 반복 가능한 조작
    ├─ scrcpy ──── 실시간 화면, 드래그, 회전, 복합 제스처
    └─ ADB/Shizuku ─ 기기 신원·연결·시스템 사실
    ↓
-다른 적절한 경로로 결과 확인 후 다음 단계
+최소 조작 → 실제 사용 경로 기록 → 새 상태로 결과 검증
 ```
 
 ## 한눈에 보는 연동 구조
 
 ### 1. Codex와 Galaxy가 동작하는 흐름
 
-![Codex와 Galaxy의 관찰·조작·검증 흐름](docs/images/galaxy-flow-1.png)
+![Codex와 Galaxy의 선택적 사전검사·조작·검증 흐름](docs/images/galaxy-flow-1-v040.svg)
 
 ### 2. 처음 연결하는 흐름
 
-![Mac과 Galaxy의 최초 설정 흐름](docs/images/galaxy-flow-2.png)
+![Mac과 Galaxy의 USB 신원 기반 최초 설정 흐름](docs/images/galaxy-flow-2-v040.svg)
 
 ### 3. Codex와 사용자가 맡는 단계
 
-![Galaxy 연결 설정의 Codex와 사용자 역할 구분](docs/images/galaxy-flow-3.png)
+![Galaxy 연결 설정의 Codex와 사용자 역할 및 세션 정책](docs/images/galaxy-flow-3-v040.svg)
 
 그림은 역할과 순서를 설명하는 일반화 자료입니다. 실제 기기 serial, IP, 토큰, 페어링
 코드는 포함하지 않습니다. 페어링 포트와 연결 포트는 서로 다른 현재값이며, 6자리 페어링
 코드는 사용자가 ADB의 표준 입력에 직접 입력하고 채팅·파일·로그에 남기지 않습니다.
+사전검사 결과는 현재 에이전트 세션에서만 재사용되고 디스크에 저장되지 않습니다. 최초
+기기 등록은 ADB 목록에서 물리적인 `usb:` 연결이 확인된 Galaxy만 허용합니다.
 
 ## 지원 범위
 
