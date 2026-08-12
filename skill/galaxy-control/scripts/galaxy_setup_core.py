@@ -5,12 +5,14 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Final
+from typing import Final, cast
 
 from galaxy_process import CommandResult, Runner
 from galaxy_profile import DeviceProfile, write_profile
 
-TAILSCALE_ADDRESS_PATTERN: Final = re.compile(r"\binet\s+([0-9.]+)/[0-9]+\b")
+TAILSCALE_ADDRESS_PATTERN: Final = re.compile(
+    r"\btun[0-9]+\s+inet\s+(100\.(?:6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9.]+)/[0-9]+\b"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +48,7 @@ class ListedDevice:
 
     serial: str
     state: str
+    transport: str
 
 
 def _parse_devices(raw: str) -> tuple[ListedDevice, ...]:
@@ -53,7 +56,8 @@ def _parse_devices(raw: str) -> tuple[ListedDevice, ...]:
     for line in raw.splitlines()[1:]:
         fields = line.split()
         if len(fields) >= 2:
-            devices.append(ListedDevice(fields[0], fields[1]))
+            transport = "usb" if any(field.startswith("usb:") for field in fields[2:]) else "other"
+            devices.append(ListedDevice(fields[0], fields[1], transport))
     return tuple(devices)
 
 
@@ -134,26 +138,33 @@ def enroll(runtime: SetupRuntime, selected_serial: str | None = None) -> DeviceP
             raise SetupError("adb_offline", "the Galaxy is offline")
         case _:
             raise SetupError("adb_device_unavailable", "the Galaxy is unavailable")
+    if device.transport != "usb":
+        raise SetupError("usb_required", "enrollment requires one physically connected Galaxy")
     prefix = (adb, "-s", device.serial, "shell")
     serial = _run_required(runtime, (*prefix, "getprop", "ro.serialno"), "serial_unavailable")
     model = _run_required(runtime, (*prefix, "getprop", "ro.product.model"), "model_unavailable")
     address = _run_required(
         runtime,
-        (*prefix, "ip", "-o", "-4", "addr", "show", "tailscale0"),
+        (*prefix, "ip", "-o", "-4", "addr", "show"),
         "tailscale_address_unavailable",
     )
     physical_serial = serial.stdout.strip()
     if physical_serial != device.serial:
         raise SetupError("device_mismatch", "listed and physical serial do not match")
     expected_model = model.stdout.strip().replace("-", "_")
-    match = TAILSCALE_ADDRESS_PATTERN.search(address.stdout)
-    if match is None:
+    matches = TAILSCALE_ADDRESS_PATTERN.findall(address.stdout)
+    if not matches:
         raise SetupError("tailscale_address_unavailable", "Galaxy tailnet address was not found")
+    if len(matches) != 1:
+        raise SetupError(
+            "tailscale_address_ambiguous",
+            "Galaxy has multiple candidate tailnet tunnel addresses",
+        )
     profile = DeviceProfile(
         schema=1,
         physical_serial=physical_serial,
         expected_model=expected_model,
-        tailscale_ipv4=match.group(1),
+        tailscale_ipv4=cast("str", matches[0]),
         openminis_port=43129,
         steady_adb_enabled=False,
     )

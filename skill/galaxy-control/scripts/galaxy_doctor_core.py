@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from enum import StrEnum, unique
 from typing import ClassVar, cast
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -23,6 +24,16 @@ class DoctorRuntime:
     runner: Runner
     which: Callable[[str], str | None]
     bridge: Callable[[BridgeRequest], SuccessResponse]
+
+
+@unique
+class PreflightTarget(StrEnum):
+    """Fixed path sets accepted by the read-only doctor."""
+
+    ALL = "all"
+    OPENMINIS = "openminis"
+    ADB = "adb"
+    SCRCPY = "scrcpy"
 
 
 class _TailscaleSelf(BaseModel):
@@ -68,6 +79,28 @@ def _adb_status(runtime: DoctorRuntime) -> JsonObject:
     if not listing.succeeded:
         return {"installed": True, "devices": [], "error": "adb_devices_failed"}
     devices = parse_devices(listing.stdout)
+    remote_candidates = [
+        device
+        for device in devices
+        if device.state == "device"
+        and device.serial.startswith(f"{runtime.profile.tailscale_ipv4}:")
+        and device.model is not None
+        and normalize_model(device.model) == runtime.profile.expected_model
+    ]
+    remote_serials: set[str] = set()
+    for device in remote_candidates:
+        physical = runtime.runner(
+            (
+                adb,
+                "-s",
+                device.serial,
+                "shell",
+                "getprop",
+                "ro.serialno",
+            )
+        )
+        if physical.succeeded and physical.stdout.strip() == runtime.profile.physical_serial:
+            remote_serials.add(device.serial)
     encoded: list[JsonValue] = [
         {
             "serial": device.serial,
@@ -81,7 +114,7 @@ def _adb_status(runtime: DoctorRuntime) -> JsonObject:
         device
         for device in devices
         if device.state == "device"
-        and device.serial == runtime.profile.physical_serial
+        and (device.serial == runtime.profile.physical_serial or device.serial in remote_serials)
         and device.model is not None
         and normalize_model(device.model) == runtime.profile.expected_model
     ]
@@ -131,34 +164,96 @@ def _shizuku_ready(value: JsonValue) -> bool:
     )
 
 
-def inspect_device(runtime: DoctorRuntime) -> JsonObject:
-    """Combine independent read-only paths without hiding partial failures."""
-    openminis: JsonObject = {
-        "health": _bridge_status(runtime, Action.HEALTH),
-        "accessibility": _bridge_status(runtime, Action.A11Y_STATUS),
-        "shizuku": _bridge_status(runtime, Action.SHIZUKU_STATUS),
-    }
-    adb = _adb_status(runtime)
-    scrcpy = _version(runtime, "scrcpy", ("--version",))
-    tailscale = _tailscale_status(runtime)
-    adb_ready = adb.get("identity_match") is True
-    openminis_ready = _bridge_available(openminis["health"]) and _bridge_available(
-        openminis["accessibility"]
+def inspect_device(
+    runtime: DoctorRuntime,
+    target: PreflightTarget = PreflightTarget.ALL,
+) -> JsonObject:
+    """Inspect only the fixed path set required by the requested task."""
+    check_openminis = target in {PreflightTarget.ALL, PreflightTarget.OPENMINIS}
+    check_adb = target in {PreflightTarget.ALL, PreflightTarget.ADB, PreflightTarget.SCRCPY}
+    check_scrcpy = target in {PreflightTarget.ALL, PreflightTarget.SCRCPY}
+    check_all = target is PreflightTarget.ALL
+
+    openminis: JsonObject = (
+        {
+            "health": _bridge_status(runtime, Action.HEALTH),
+            "accessibility": _bridge_status(runtime, Action.A11Y_STATUS),
+            **({"shizuku": _bridge_status(runtime, Action.SHIZUKU_STATUS)} if check_all else {}),
+        }
+        if check_openminis
+        else {"probed": False}
     )
-    paths: JsonObject = {
-        "openminis": openminis_ready,
-        "scrcpy": adb_ready and scrcpy.get("installed") is True,
-        "adb": adb_ready,
-        "shizuku": _shizuku_ready(openminis["shizuku"]),
-    }
-    all_ready = all(value is True for value in paths.values()) and tailscale.get("online") is True
+    adb = _adb_status(runtime) if check_adb else {"probed": False}
+    scrcpy = _version(runtime, "scrcpy", ("--version",)) if check_scrcpy else {"probed": False}
+    tailscale = _tailscale_status(runtime) if check_all else {"probed": False}
+    adb_ready = adb.get("identity_match") is True
+    openminis_ready = (
+        check_openminis
+        and _bridge_available(openminis.get("health"))
+        and _bridge_available(openminis.get("accessibility"))
+    )
+    scrcpy_ready = adb_ready and scrcpy.get("installed") is True
+    paths: JsonObject
+    if target is PreflightTarget.OPENMINIS:
+        paths = cast("JsonObject", {"openminis": bool(openminis_ready)})
+        checked_paths: list[JsonValue] = ["openminis"]
+    elif target is PreflightTarget.ADB:
+        paths = cast("JsonObject", {"adb": bool(adb_ready)})
+        checked_paths = ["adb"]
+    elif target is PreflightTarget.SCRCPY:
+        paths = cast(
+            "JsonObject",
+            {"adb": bool(adb_ready), "scrcpy": bool(scrcpy_ready)},
+        )
+        checked_paths = ["adb", "scrcpy"]
+    else:
+        paths = cast(
+            "JsonObject",
+            {
+                "openminis": bool(openminis_ready),
+                "scrcpy": bool(scrcpy_ready),
+                "adb": bool(adb_ready),
+                "shizuku": bool(_shizuku_ready(openminis["shizuku"])),
+            },
+        )
+        checked_paths = ["openminis", "adb", "scrcpy", "shizuku", "tailscale"]
+    all_ready = all(value is True for value in paths.values()) and (
+        target is not PreflightTarget.ALL or tailscale.get("online") is True
+    )
     any_ready = any(value is True for value in paths.values())
-    return {
-        "status": "READY" if all_ready else "DEGRADED" if any_ready else "BLOCKED",
-        "openminis": openminis,
-        "adb": adb,
-        "scrcpy": scrcpy,
-        "tailscale": tailscale,
-        "control_paths": paths,
-        "read_only": True,
-    }
+    requested_ready = (
+        paths.get(target.value) is True if target is not PreflightTarget.ALL else all_ready
+    )
+    return cast(
+        "JsonObject",
+        {
+            "status": (
+                "READY"
+                if all_ready
+                else "BLOCKED"
+                if target is not PreflightTarget.ALL and not requested_ready
+                else "DEGRADED"
+                if any_ready
+                else "BLOCKED"
+            ),
+            "requested_path": target.value,
+            "checked_paths": checked_paths,
+            "reuse": {
+                "scope": "current_agent_session",
+                "persisted": False,
+                "invalidate_on": [
+                    "device_reboot",
+                    "network_change",
+                    "bridge_error",
+                    "adb_error",
+                    "process_death",
+                ],
+            },
+            "openminis": openminis,
+            "adb": adb,
+            "scrcpy": scrcpy,
+            "tailscale": tailscale,
+            "control_paths": paths,
+            "read_only": True,
+        },
+    )

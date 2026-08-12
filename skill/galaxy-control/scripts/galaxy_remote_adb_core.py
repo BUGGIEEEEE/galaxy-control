@@ -14,7 +14,7 @@ from galaxy_adb import (
     run_adb,
     verify_endpoint,
 )
-from galaxy_process import JsonObject, error_envelope, success_envelope
+from galaxy_process import JsonObject, RouteMetadata, error_envelope, success_envelope, with_route
 
 
 @unique
@@ -148,4 +148,46 @@ def execute_legacy(argv: Sequence[str], runtime: AdbRuntime) -> tuple[JsonObject
                 raise AdbError("invalid_request", "unsupported ADB command or option")
     except AdbError as error:
         return error_envelope(action, error.code, error.message), 1
-    return success_envelope(action, result), 0
+    mutating = action in {
+        "enable",
+        "disconnect",
+        "legacy-disconnect",
+        "restore-usb",
+    }
+    uses_remote = (
+        action
+        in {
+            "connect",
+            "recover",
+            "legacy-connect",
+            "disconnect",
+            "legacy-disconnect",
+            "restore-usb",
+        }
+        or result.get("remote_connected") is True
+    )
+    transport = "adb_tcpip" if uses_remote else "adb_usb"
+    role = (
+        "connect"
+        if action
+        in {
+            "connect",
+            "recover",
+            "legacy-connect",
+            "disconnect",
+            "legacy-disconnect",
+        }
+        else "system"
+    )
+    verification_required = result.get("verification_required") is True or mutating
+    routed = with_route(
+        result,
+        RouteMetadata(
+            controller="adb",
+            transport=transport,
+            role=role,
+            verification_required=verification_required,
+            verify_with=("adb", "openminis") if verification_required else (),
+        ),
+    )
+    return success_envelope(action, routed), 0

@@ -61,7 +61,7 @@ Finish with:
 
 ```sh
 uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_setup.py" verify
-uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py"
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py" all
 ```
 
 `READY` proves local diagnosed paths, not Computer Use permission or a real end-to-end control. A

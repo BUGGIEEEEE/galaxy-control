@@ -60,3 +60,13 @@ def test_oneui_artifact_checkers_cannot_issue_phone_or_shell_commands() -> None:
     assert "adb " not in source
     assert "scrcpy" not in source
     assert "shell=" not in source
+
+
+def test_openminis_wrapper_does_not_scan_or_repair_quarantine_per_call() -> None:
+    # Given
+    source = (ROOT / "skill" / "galaxy-control" / "scripts" / "galaxy_control.sh").read_text()
+
+    # When / Then
+    assert "runtime-quarantine-guard" not in source
+    assert "xattr" not in source
+    assert " repair " not in source

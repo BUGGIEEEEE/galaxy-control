@@ -31,7 +31,16 @@ def test_response_accepts_matching_success_action() -> None:
     response = parse_response(content, Action.HEALTH)
 
     # Then
-    assert response.result == {"status": "ok"}
+    assert response.result == {
+        "status": "ok",
+        "route": {
+            "controller": "openminis",
+            "transport": "tailscale_http",
+            "role": "observe",
+            "verification_required": False,
+            "verify_with": [],
+        },
+    }
 
 
 def test_response_rejects_mismatched_action() -> None:
@@ -69,3 +78,45 @@ def test_invalid_environment_token_is_rejected(monkeypatch: pytest.MonkeyPatch) 
     # When / Then
     with pytest.raises(ClientError, match="token"):
         read_token()
+
+
+def test_openminis_action_payload_identifies_route_and_verification_need() -> None:
+    # Given
+    response = parse_response(
+        b'{"ok":true,"action":"tap_text","result":{"performed":true}}',
+        Action.TAP_TEXT,
+    )
+
+    # When
+    payload = response.model_dump(mode="json")
+
+    # Then
+    assert payload["result"]["route"] == {
+        "controller": "openminis",
+        "transport": "tailscale_http",
+        "role": "act",
+        "verification_required": True,
+        "verify_with": ["openminis", "adb"],
+    }
+    assert payload["result"]["route"]["verify_with"] == ["openminis", "adb"]
+
+
+@pytest.mark.parametrize("result_json", ["[]", '"text"', "1", "null"])
+def test_success_response_rejects_non_object_result(result_json: str) -> None:
+    # Given
+    content = f'{{"ok":true,"action":"health","result":{result_json}}}'.encode()
+
+    # When / Then
+    with pytest.raises(ClientError) as captured:
+        parse_response(content, Action.HEALTH)
+    assert captured.value.code == "invalid_response"
+
+
+def test_success_response_rejects_bridge_owned_route_field() -> None:
+    # Given
+    content = b'{"ok":true,"action":"health","result":{"route":"untrusted"}}'
+
+    # When / Then
+    with pytest.raises(ClientError) as captured:
+        parse_response(content, Action.HEALTH)
+    assert captured.value.code == "invalid_response"

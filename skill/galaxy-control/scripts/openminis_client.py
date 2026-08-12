@@ -30,7 +30,7 @@ import httpx2
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, TypeAdapter, ValidationError
 from pydantic import JsonValue as PydanticJsonValue
 
-from galaxy_process import JsonValue
+from galaxy_process import JsonObject, JsonValue, RouteMetadata, with_route
 from galaxy_profile import ProfileError, load_profile
 from openminis_protocol import Action, BridgeRequest, ProtocolError, parse_command
 
@@ -131,7 +131,30 @@ def parse_response(content: bytes, expected_action: Action) -> SuccessResponse:
                 raise ClientError(
                     "action_mismatch", "bridge response action does not match request"
                 )
-            return envelope
+            if not isinstance(envelope.result, dict) or "route" in envelope.result:
+                raise ClientError(
+                    "invalid_response",
+                    "bridge success result must be an object without reserved route metadata",
+                )
+            result = cast("JsonObject", envelope.result)
+            is_action = expected_action in {
+                Action.INPUT_KEY,
+                Action.TAP_TEXT,
+                Action.TAP_XY,
+                Action.INPUT_TEXT,
+                Action.SCROLL_XY,
+            }
+            routed = with_route(
+                result,
+                RouteMetadata(
+                    controller="openminis",
+                    transport="tailscale_http",
+                    role="act" if is_action else "observe",
+                    verification_required=is_action,
+                    verify_with=("openminis", "adb") if is_action else (),
+                ),
+            )
+            return SuccessResponse(ok=True, action=envelope.action, result=routed)
         case unreachable:
             assert_never(unreachable)
 

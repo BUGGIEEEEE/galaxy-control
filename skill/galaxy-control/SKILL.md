@@ -18,6 +18,8 @@ GALAXY_SKILL_ROOT="${CODEX_HOME:-$HOME/.codex}/skills/galaxy-control"
 
 Do not use a development checkout or another user's profile.
 
+Under OmO Native, first read [runtime-omo.md](references/runtime-omo.md).
+
 ## Set up a new user
 
 Read [setup-and-enrollment.md](references/setup-and-enrollment.md) before any first-time setup,
@@ -49,11 +51,18 @@ then use `LIFECYCLE.md` for fixed `status`, conditional `start`, and `stop` only
 
 ## Start every Galaxy task
 
-Run the combined read-only doctor whenever path availability matters:
+Classify the task first, then run only the matching read-only preflight:
 
 ```sh
-uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py"
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py" openminis
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py" adb
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py" scrcpy
 ```
+
+The scrcpy target includes its ADB dependency. Use the no-argument or `all` doctor only for a new
+control session, after reboot/network changes or connection errors, or for tasks that truly cross
+all categories. Reuse a successful result only in the current agent session and invalidate it on
+any event listed in `result.reuse.invalidate_on`; live readiness is never persisted.
 
 Before semantic UI control, require fresh OpenMinis health and Accessibility evidence:
 
@@ -98,6 +107,11 @@ validate saved evidence; they never select, move, or otherwise control the phone
 Read [verification.md](references/verification.md) for every state-changing or consequential task.
 Opening scrcpy, receiving an HTTP 200, or returning an ADB success code is not proof of the user's
 requested outcome.
+
+After performing an action through OpenMinis, ADB, or scrcpy, read that adapter result's
+`result.route` to report the actual controller and transport. When
+`result.route.verification_required` is true, freshly verify through an appropriate entry in
+`result.route.verify_with`.
 
 For multi-app One UI work, also maintain an item-level selection ledger and progress log. Do not
 repeat an uncertain `Done` or move action. Re-observe the destination and source instead.

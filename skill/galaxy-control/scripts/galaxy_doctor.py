@@ -20,18 +20,38 @@ import json
 import sys
 from collections.abc import Sequence
 
-from galaxy_doctor_core import DoctorRuntime, inspect_device
-from galaxy_process import error_envelope, run_command, success_envelope
+from galaxy_doctor_core import DoctorRuntime, PreflightTarget, inspect_device
+from galaxy_process import JsonObject, error_envelope, run_command, success_envelope
 from galaxy_profile import ProfileError, load_profile
 from galaxy_setup import find_executable
 from openminis_client import call_bridge
 
 
+def execute(argv: Sequence[str], runtime: DoctorRuntime) -> tuple[JsonObject, int]:
+    """Execute one fixed read-only preflight target."""
+    match tuple(argv):
+        case ():
+            target = PreflightTarget.ALL
+        case ("all" | "openminis" | "adb" | "scrcpy" as raw_target,):
+            target = PreflightTarget(raw_target)
+        case _:
+            return error_envelope(
+                "doctor",
+                "invalid_request",
+                "doctor accepts only all|openminis|adb|scrcpy",
+            ), 1
+    return success_envelope("doctor", inspect_device(runtime, target)), 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Print exactly one stable JSON envelope."""
     args = tuple(sys.argv[1:] if argv is None else argv)
-    if args:
-        envelope = error_envelope("doctor", "invalid_request", "doctor accepts no arguments")
+    if args not in {(), ("all",), ("openminis",), ("adb",), ("scrcpy",)}:
+        envelope = error_envelope(
+            "doctor",
+            "invalid_request",
+            "doctor accepts only all|openminis|adb|scrcpy",
+        )
         exit_code = 1
     else:
         try:
@@ -41,8 +61,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             exit_code = 1
         else:
             runtime = DoctorRuntime(profile, run_command, find_executable, call_bridge)
-            envelope = success_envelope("doctor", inspect_device(runtime))
-            exit_code = 0
+            envelope, exit_code = execute(args, runtime)
     _ = sys.stdout.write(json.dumps(envelope, ensure_ascii=False, separators=(",", ":")) + "\n")
     return exit_code
 

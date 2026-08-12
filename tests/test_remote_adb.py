@@ -56,6 +56,13 @@ def test_legacy_connect_uses_profile_endpoint_and_verifies_identity() -> None:
     assert exit_code == 0
     assert envelope["result"]["endpoint"] == "100.64.1.20:5555"
     assert runner.calls[0][0] == ("/opt/homebrew/bin/adb", "connect", "100.64.1.20:5555")
+    assert envelope["result"]["route"] == {
+        "controller": "adb",
+        "transport": "adb_tcpip",
+        "role": "connect",
+        "verification_required": False,
+        "verify_with": [],
+    }
 
 
 def test_connect_rejected_when_steady_path_is_not_enabled() -> None:
@@ -65,6 +72,50 @@ def test_connect_rejected_when_steady_path_is_not_enabled() -> None:
     # Then
     assert exit_code == 1
     assert envelope["error"]["code"] == "steady_adb_disabled"
+
+
+def test_status_labels_connected_remote_transport() -> None:
+    # Given
+    runner = FakeRunner(
+        [
+            result(
+                "List of devices attached\n100.64.1.20:5555 device model:SM_S921B transport_id:2\n"
+            )
+        ]
+    )
+
+    # When
+    envelope, exit_code = execute(("status",), runtime(runner))
+
+    # Then
+    assert exit_code == 0
+    assert envelope["result"]["route"]["transport"] == "adb_tcpip"
+
+
+def test_disconnect_labels_remote_transport_and_requires_verification() -> None:
+    # Given
+    runner = FakeRunner([result("disconnected\n")])
+
+    # When
+    envelope, exit_code = execute(("disconnect",), runtime(runner))
+
+    # Then
+    assert exit_code == 0
+    assert envelope["result"]["route"]["transport"] == "adb_tcpip"
+    assert envelope["result"]["route"]["verification_required"] is True
+
+
+def test_restore_usb_requires_post_action_verification() -> None:
+    # Given
+    runner = FakeRunner([result("restarting in USB mode\n")])
+
+    # When
+    envelope, exit_code = execute(("restore-usb", "--approved"), runtime(runner))
+
+    # Then
+    assert exit_code == 0
+    assert envelope["result"]["route"]["transport"] == "adb_tcpip"
+    assert envelope["result"]["route"]["verification_required"] is True
 
 
 @pytest.mark.parametrize(

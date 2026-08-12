@@ -14,7 +14,7 @@ After a Galaxy reboot, diagnose first. Do not assume every step is needed.
 
 ## Mac actions
 
-1. Run `galaxy_doctor.py`.
+1. Run `galaxy_doctor.py all`.
 2. If pairing trust remains, run `wireless-connect --port CURRENT_CONNECTION_PORT`.
 3. If trust was lost, request approval and pair once using the displayed pairing port/code.
 4. Verify serial, model, and boot identity.

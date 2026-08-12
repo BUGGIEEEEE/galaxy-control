@@ -42,6 +42,11 @@ def test_agent_metadata_mentions_explicit_skill_prompt() -> None:
     assert 'display_name: "Galaxy Control"' in content
     assert "$galaxy-control" in content
     assert "allow_implicit_invocation: true" in content
+    assert 'openminis: ["scripts/galaxy_doctor.py", "openminis"]' in content
+    assert 'adb: ["scripts/galaxy_doctor.py", "adb"]' in content
+    assert 'scrcpy: ["scripts/galaxy_doctor.py", "scrcpy"]' in content
+    assert 'session_reuse: "memory_only"' in content
+    assert 'result_route_field: "result.route"' in content
 
 
 def test_entry_scripts_are_executable_and_have_pep723_metadata() -> None:

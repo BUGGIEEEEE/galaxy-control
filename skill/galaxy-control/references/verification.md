@@ -2,6 +2,10 @@
 
 Verification answers “did the requested state actually change?”, not “did a command run?”
 
+Every reviewed adapter returns `result.route` with the controller, transport, action role, whether
+fresh verification is required, and fixed verification candidates. This metadata describes the
+path actually used; it does not itself prove that the action succeeded.
+
 ## Evidence strength
 
 1. Destination state from a different path: strongest.

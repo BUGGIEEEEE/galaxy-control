@@ -4,3 +4,11 @@ interface:
   default_prompt: "Use $galaxy-control to diagnose my setup and OpenMinis bridge, prepare only the approved private handoff if needed, choose one safe Galaxy control path, use item-level evidence for One UI folder work, perform the minimum requested action, and verify the result independently."
 policy:
   allow_implicit_invocation: true
+runtime:
+  omo:
+    preflight:
+      openminis: ["scripts/galaxy_doctor.py", "openminis"]
+      adb: ["scripts/galaxy_doctor.py", "adb"]
+      scrcpy: ["scripts/galaxy_doctor.py", "scrcpy"]
+    session_reuse: "memory_only"
+    result_route_field: "result.route"

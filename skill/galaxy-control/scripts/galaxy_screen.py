@@ -23,10 +23,29 @@ from collections.abc import Sequence
 from typing import assert_never
 
 from galaxy_adb import AdbRuntime
-from galaxy_process import JsonObject, error_envelope, run_command, success_envelope
+from galaxy_process import (
+    JsonObject,
+    RouteMetadata,
+    error_envelope,
+    run_command,
+    success_envelope,
+    with_route,
+)
 from galaxy_profile import ProfileError, load_profile
 from galaxy_screen_core import ScreenError, parse_request
 from galaxy_screen_session import ScreenRuntime, doctor, start, stop
+
+
+def route_for_action(action: str, result: JsonObject) -> RouteMetadata:
+    """Return fixed scrcpy route metadata for one reviewed action."""
+    verification_required = result.get("verification_required") is True
+    return RouteMetadata(
+        controller="scrcpy",
+        transport="adb",
+        role="act" if action == "control" else "record" if action == "record" else "observe",
+        verification_required=verification_required,
+        verify_with=("openminis", "scrcpy") if verification_required else (),
+    )
 
 
 def execute(argv: Sequence[str], runtime: ScreenRuntime) -> tuple[JsonObject, int]:
@@ -45,7 +64,11 @@ def execute(argv: Sequence[str], runtime: ScreenRuntime) -> tuple[JsonObject, in
                 assert_never(unreachable)
     except ScreenError as error:
         return error_envelope(action, error.code, error.message), 1
-    return success_envelope(action, result), 0
+    routed = with_route(
+        result,
+        route_for_action(action, result),
+    )
+    return success_envelope(action, routed), 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:

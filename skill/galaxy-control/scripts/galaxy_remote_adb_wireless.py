@@ -9,7 +9,7 @@ from enum import StrEnum, unique
 from typing import Final, NewType, assert_never
 
 from galaxy_adb import AdbError, AdbRuntime, adb_path, list_devices, run_adb, verify_endpoint
-from galaxy_process import JsonObject, error_envelope, success_envelope
+from galaxy_process import JsonObject, RouteMetadata, error_envelope, success_envelope, with_route
 from galaxy_wireless_state import WirelessState, load_state, profile_hash, write_state
 
 PAIR_CODE_PATTERN: Final = re.compile(r"^[0-9]{6}$")
@@ -227,4 +227,45 @@ def execute_wireless(argv: Sequence[str], runtime: AdbRuntime) -> tuple[JsonObje
                 assert_never(unreachable)
     except AdbError as error:
         return error_envelope(action, error.code, error.message), 1
-    return success_envelope(action, result), 0
+    mutating = request.action in {
+        WirelessAction.PAIR,
+        WirelessAction.CONNECT,
+        WirelessAction.RECOVER,
+        WirelessAction.LEGACY_ENABLE,
+        WirelessAction.DISCONNECT,
+    }
+    observed_transports: set[str] = set()
+    devices_value = result.get("devices")
+    if isinstance(devices_value, list):
+        for item in devices_value:
+            if isinstance(item, dict):
+                transport_value = item.get("transport")
+                if isinstance(transport_value, str):
+                    observed_transports.add(transport_value)
+    transport = (
+        "adb_usb"
+        if request.action in {WirelessAction.DOCTOR, WirelessAction.STATUS}
+        and observed_transports == {"usb"}
+        else "adb_tcpip"
+    )
+    routed = with_route(
+        result,
+        RouteMetadata(
+            controller="adb",
+            transport=transport,
+            role="connect"
+            if request.action
+            in {
+                WirelessAction.PAIR,
+                WirelessAction.CONNECT,
+                WirelessAction.RECOVER,
+                WirelessAction.DISCONNECT,
+            }
+            else "system",
+            verification_required=result.get("verification_required") is True or mutating,
+            verify_with=("adb", "openminis")
+            if result.get("verification_required") is True or mutating
+            else (),
+        ),
+    )
+    return success_envelope(action, routed), 0

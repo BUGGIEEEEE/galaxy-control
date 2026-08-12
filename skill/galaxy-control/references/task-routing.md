@@ -2,6 +2,19 @@
 
 Use the smallest path that directly matches the request.
 
+Classify the task before probing the phone, then run only the matching fixed preflight:
+
+```sh
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py" openminis
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py" adb
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py" scrcpy
+```
+
+The `scrcpy` target includes its ADB dependency. Use the no-argument or `all` target only for a new
+control session, after reboot/network changes or bridge/ADB errors, or for work that truly crosses
+all path categories. Reuse a successful result only in the current agent session and invalidate it
+on any event listed in `result.reuse.invalidate_on`.
+
 | Path | Recognizes output as | Sends input as | Best use | Main weakness |
 | --- | --- | --- | --- | --- |
 | OpenMinis | Accessibility nodes, text, roles, bounds, state | Fixed semantic taps, text, keys, scroll | Repeatable meaning-based UI work | May miss animation, canvas, video, or custom views |

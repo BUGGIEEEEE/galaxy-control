@@ -89,6 +89,23 @@ def test_wireless_pair_rejects_invalid_code_before_adb_call() -> None:
     assert runner.calls == []
 
 
+def test_wireless_status_labels_usb_only_observation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Given
+    monkeypatch.setenv("GALAXY_WIRELESS_STATE_DIR", str(tmp_path / "wireless"))
+    runner = FakeRunner(
+        [result("List of devices attached\nDEMO123456 device model:SM_S921B usb:1-1\n")]
+    )
+
+    # When
+    envelope, exit_code = execute(("wireless-status",), runtime(runner))
+
+    # Then
+    assert exit_code == 0
+    assert envelope["result"]["route"]["transport"] == "adb_usb"
+
+
 def test_wireless_connect_verifies_identity_and_writes_private_boot_state(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

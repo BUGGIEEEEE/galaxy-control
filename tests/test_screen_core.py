@@ -4,9 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from galaxy_adb import AdbDevice
+from galaxy_adb import AdbDevice, AdbRuntime
+from galaxy_process import CommandResult
 from galaxy_profile import DeviceProfile
+from galaxy_screen import execute, route_for_action
 from galaxy_screen_core import ScreenError, build_scrcpy_argv, parse_request, select_device
+from galaxy_screen_session import ScreenRuntime
 
 
 def profile() -> DeviceProfile:
@@ -120,3 +123,40 @@ def test_select_rejects_model_mismatch() -> None:
     with pytest.raises(ScreenError) as captured:
         select_device(profile(), (device(model="SM_OTHER"),), None)
     assert captured.value.code == "device_mismatch"
+
+
+def test_scrcpy_doctor_payload_identifies_adb_transport() -> None:
+    # Given
+    def runner(argv: tuple[str, ...], *, stdin: str | None = None) -> CommandResult:
+        assert stdin is None
+        if argv[-2:] == ("devices", "-l"):
+            return CommandResult(
+                0,
+                "List of devices attached\nDEMO123456 device model:SM_S921B usb:1-1\n",
+                "",
+            )
+        raise AssertionError(argv)
+
+    adb = AdbRuntime(profile(), "/opt/homebrew/bin/adb", runner, lambda: "")
+    runtime = ScreenRuntime(adb, "/opt/homebrew/bin/scrcpy", runner)
+
+    # When
+    envelope, exit_code = execute(("doctor",), runtime)
+
+    # Then
+    assert exit_code == 0
+    assert envelope["result"]["route"] == {
+        "controller": "scrcpy",
+        "transport": "adb",
+        "role": "observe",
+        "verification_required": False,
+        "verify_with": [],
+    }
+
+
+def test_scrcpy_record_route_reports_recording_role() -> None:
+    # Given
+    route = route_for_action("record", {"verification_required": False})
+
+    # When / Then
+    assert route.role == "record"

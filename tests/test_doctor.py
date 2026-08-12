@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
+from pathlib import Path
+from typing import TYPE_CHECKING
 
-from galaxy_doctor_core import DoctorRuntime, inspect_device
+from galaxy_doctor import execute, main
+from galaxy_doctor_core import DoctorRuntime, PreflightTarget, inspect_device
 from galaxy_process import CommandResult
 from galaxy_profile import DeviceProfile
 from openminis_client import ClientError, SuccessResponse
 from openminis_protocol import Action, BridgeRequest
+
+if TYPE_CHECKING:
+    import pytest
 
 
 class FakeRunner:
@@ -141,3 +148,197 @@ def test_doctor_bridge_callable_has_typed_contract() -> None:
 
     # Then
     assert callback(BridgeRequest(Action.HEALTH)).action is Action.HEALTH
+
+
+def test_openminis_preflight_skips_adb_scrcpy_and_shizuku() -> None:
+    # Given
+    runner = FakeRunner([])
+    checked: list[Action] = []
+
+    def tracked_bridge(request: BridgeRequest) -> SuccessResponse:
+        checked.append(request.action)
+        return bridge(request)
+
+    runtime = DoctorRuntime(profile(), runner, paths, tracked_bridge)
+
+    # When
+    report = inspect_device(runtime, target=PreflightTarget.OPENMINIS)
+
+    # Then
+    assert runner.calls == []
+    assert checked == [Action.HEALTH, Action.A11Y_STATUS]
+    assert report["requested_path"] == "openminis"
+    assert report["checked_paths"] == ["openminis"]
+    assert report["control_paths"] == {"openminis": True}
+
+
+def test_adb_preflight_skips_openminis_scrcpy_and_tailscale() -> None:
+    # Given
+    runner = FakeRunner(
+        [
+            result("Android Debug Bridge version 1.0.41\n"),
+            result("List of devices attached\nDEMO123456 device model:SM-S921B usb:1-1\n"),
+        ]
+    )
+
+    def unexpected_bridge(_request: BridgeRequest) -> SuccessResponse:
+        raise AssertionError("OpenMinis must not run for an ADB-only preflight")
+
+    runtime = DoctorRuntime(profile(), runner, paths, unexpected_bridge)
+
+    # When
+    report = inspect_device(runtime, target=PreflightTarget.ADB)
+
+    # Then
+    assert len(runner.calls) == 2
+    assert all("scrcpy" not in call and "tailscale" not in call for call in runner.calls)
+    assert report["requested_path"] == "adb"
+    assert report["checked_paths"] == ["adb"]
+    assert report["control_paths"] == {"adb": True}
+
+
+def test_scrcpy_preflight_requires_adb_without_openminis_or_tailscale() -> None:
+    # Given
+    runner = FakeRunner(
+        [
+            result("Android Debug Bridge version 1.0.41\n"),
+            result("List of devices attached\nDEMO123456 device model:SM-S921B usb:1-1\n"),
+            result("scrcpy 3.3.3\n"),
+        ]
+    )
+
+    def unexpected_bridge(_request: BridgeRequest) -> SuccessResponse:
+        raise AssertionError("OpenMinis must not run for a scrcpy preflight")
+
+    runtime = DoctorRuntime(profile(), runner, paths, unexpected_bridge)
+
+    # When
+    report = inspect_device(runtime, target=PreflightTarget.SCRCPY)
+
+    # Then
+    assert len(runner.calls) == 3
+    assert all("tailscale" not in call for call in runner.calls)
+    assert report["requested_path"] == "scrcpy"
+    assert report["checked_paths"] == ["adb", "scrcpy"]
+    assert report["control_paths"] == {"adb": True, "scrcpy": True}
+
+
+def test_scrcpy_preflight_is_blocked_when_scrcpy_is_unavailable() -> None:
+    # Given
+    runner = FakeRunner(
+        [
+            result("Android Debug Bridge version 1.0.41\n"),
+            result("List of devices attached\nDEMO123456 device model:SM-S921B usb:1-1\n"),
+        ]
+    )
+    runtime = DoctorRuntime(
+        profile(),
+        runner,
+        lambda name: paths(name) if name != "scrcpy" else None,
+        bridge,
+    )
+
+    # When
+    report = inspect_device(runtime, target=PreflightTarget.SCRCPY)
+
+    # Then
+    assert report["status"] == "BLOCKED"
+    assert report["control_paths"] == {"adb": True, "scrcpy": False}
+
+
+def test_adb_preflight_verifies_physical_serial_behind_remote_transport() -> None:
+    # Given
+    runner = FakeRunner(
+        [
+            result("Android Debug Bridge version 1.0.41\n"),
+            result("List of devices attached\n100.64.1.20:5555 device model:SM_S921B\n"),
+            result("DEMO123456\n"),
+        ]
+    )
+    runtime = DoctorRuntime(profile(), runner, paths, bridge)
+
+    # When
+    report = inspect_device(runtime, target=PreflightTarget.ADB)
+
+    # Then
+    assert report["control_paths"] == {"adb": True}
+    assert runner.calls[-1] == (
+        "/opt/homebrew/bin/adb",
+        "-s",
+        "100.64.1.20:5555",
+        "shell",
+        "getprop",
+        "ro.serialno",
+    )
+
+
+def test_doctor_cli_accepts_only_fixed_preflight_targets() -> None:
+    # Given
+    runtime = DoctorRuntime(
+        profile(),
+        FakeRunner(
+            [
+                result("Android Debug Bridge version 1.0.41\n"),
+                result("List of devices attached\nDEMO123456 device model:SM-S921B usb:1-1\n"),
+            ]
+        ),
+        paths,
+        bridge,
+    )
+
+    # When
+    envelope, exit_code = execute(("adb",), runtime)
+
+    # Then
+    assert exit_code == 0
+    assert envelope["result"]["requested_path"] == "adb"
+
+
+def test_doctor_cli_rejects_unknown_preflight_target() -> None:
+    # Given / When
+    envelope, exit_code = execute(
+        ("shell",),
+        DoctorRuntime(profile(), FakeRunner([]), paths, bridge),
+    )
+
+    # Then
+    assert exit_code == 1
+    assert envelope["error"]["code"] == "invalid_request"
+
+
+def test_doctor_main_rejects_invalid_target_before_profile_access(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Given
+    monkeypatch.setenv("GALAXY_CONTROL_HOME", str(tmp_path / "missing"))
+
+    # When
+    exit_code = main(("shell",))
+    output = json.loads(capsys.readouterr().out)
+
+    # Then
+    assert exit_code == 1
+    assert output["error"]["code"] == "invalid_request"
+
+
+def test_preflight_result_declares_session_reuse_and_invalidation_contract() -> None:
+    # Given
+    runtime = DoctorRuntime(profile(), FakeRunner([]), paths, bridge)
+
+    # When
+    report = inspect_device(runtime, target=PreflightTarget.OPENMINIS)
+
+    # Then
+    assert report["reuse"] == {
+        "scope": "current_agent_session",
+        "persisted": False,
+        "invalidate_on": [
+            "device_reboot",
+            "network_change",
+            "bridge_error",
+            "adb_error",
+            "process_death",
+        ],
+    }

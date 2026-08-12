@@ -38,7 +38,10 @@ def test_enroll_reads_identity_and_tailnet_address_from_one_live_device(
             result("List of devices attached\nDEMO123456 device model:SM_S921B usb:1-1\n"),
             result("DEMO123456\n"),
             result("SM-S921B\n"),
-            result("8: tailscale0    inet 100.64.1.20/32 scope global tailscale0\n"),
+            result(
+                "7: wlan0    inet 192.168.1.20/24 scope global wlan0\n"
+                "8: tun0    inet 100.64.1.20/32 scope global tun0\n"
+            ),
         ]
     )
     env = runtime(runner, lambda name: "/opt/homebrew/bin/adb" if name == "adb" else None)
@@ -60,7 +63,6 @@ def test_enroll_reads_identity_and_tailnet_address_from_one_live_device(
         "-4",
         "addr",
         "show",
-        "tailscale0",
     )
 
 
@@ -94,7 +96,7 @@ def test_enroll_accepts_exact_live_serial_when_multiple_devices(
             ),
             result("DEMO123456\n"),
             result("SM-S921B\n"),
-            result("8: tailscale0    inet 100.64.1.20/32 scope global tailscale0\n"),
+            result("8: tun0    inet 100.64.1.20/32 scope global tun0\n"),
         ]
     )
     env = runtime(runner, lambda _: "/opt/homebrew/bin/adb")
@@ -105,6 +107,105 @@ def test_enroll_accepts_exact_live_serial_when_multiple_devices(
     # Then
     assert enrolled.physical_serial == "DEMO123456"
     assert runner.calls[1][:3] == ("/opt/homebrew/bin/adb", "-s", "DEMO123456")
+
+
+def test_enroll_refuses_remote_adb_transport_as_trust_root() -> None:
+    # Given
+    runner = FakeRunner(
+        [
+            result(
+                "List of devices attached\n100.64.1.20:5555 device model:SM_F956N transport_id:2\n"
+            ),
+        ]
+    )
+    env = runtime(runner, lambda _: "/opt/homebrew/bin/adb")
+
+    # When / Then
+    with pytest.raises(SetupError) as captured:
+        enroll(env, "100.64.1.20:5555")
+    assert captured.value.code == "usb_required"
+    assert len(runner.calls) == 1
+
+
+def test_enroll_refuses_emulator_transport_as_trust_root() -> None:
+    # Given
+    runner = FakeRunner(
+        [result("List of devices attached\nemulator-5554 device model:SM_S921B transport_id:1\n")]
+    )
+    env = runtime(runner, lambda _: "/opt/homebrew/bin/adb")
+
+    # When / Then
+    with pytest.raises(SetupError) as captured:
+        enroll(env, "emulator-5554")
+    assert captured.value.code == "usb_required"
+    assert len(runner.calls) == 1
+
+
+def test_enroll_refuses_usb_transport_with_mismatched_physical_serial(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Given
+    monkeypatch.setenv("GALAXY_CONTROL_HOME", str(tmp_path / "support"))
+    runner = FakeRunner(
+        [
+            result("List of devices attached\nDEMO123456 device model:SM_S921B usb:1-1\n"),
+            result("DIFFERENT123\n"),
+            result("SM-S921B\n"),
+            result("8: tun0    inet 100.64.1.20/32 scope global tun0\n"),
+        ]
+    )
+    env = runtime(runner, lambda _: "/opt/homebrew/bin/adb")
+
+    # When / Then
+    with pytest.raises(SetupError) as captured:
+        enroll(env)
+    assert captured.value.code == "device_mismatch"
+
+
+def test_enroll_ignores_carrier_cgnat_and_uses_tunnel_address(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Given
+    monkeypatch.setenv("GALAXY_CONTROL_HOME", str(tmp_path / "support"))
+    runner = FakeRunner(
+        [
+            result("List of devices attached\nDEMO123456 device model:SM_S921B usb:1-1\n"),
+            result("DEMO123456\n"),
+            result("SM-S921B\n"),
+            result(
+                "2: rmnet_data0    inet 100.65.20.3/30 scope global rmnet_data0\n"
+                "8: tun0    inet 100.64.1.20/32 scope global tun0\n"
+            ),
+        ]
+    )
+    env = runtime(runner, lambda _: "/opt/homebrew/bin/adb")
+
+    # When
+    enrolled = enroll(env)
+
+    # Then
+    assert enrolled.tailscale_ipv4 == "100.64.1.20"
+
+
+def test_enroll_refuses_multiple_tailnet_tunnel_candidates() -> None:
+    # Given
+    runner = FakeRunner(
+        [
+            result("List of devices attached\nDEMO123456 device model:SM_S921B usb:1-1\n"),
+            result("DEMO123456\n"),
+            result("SM-S921B\n"),
+            result(
+                "8: tun0    inet 100.65.20.3/32 scope global tun0\n"
+                "9: tun1    inet 100.64.1.20/32 scope global tun1\n"
+            ),
+        ]
+    )
+    env = runtime(runner, lambda _: "/opt/homebrew/bin/adb")
+
+    # When / Then
+    with pytest.raises(SetupError) as captured:
+        enroll(env)
+    assert captured.value.code == "tailscale_address_ambiguous"
 
 
 def test_enroll_rejects_serial_not_in_live_list_without_using_it() -> None:
