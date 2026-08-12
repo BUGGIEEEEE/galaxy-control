@@ -45,3 +45,18 @@ def test_executable_python_exposes_no_broad_process_or_shell_command() -> None:
     assert "os.system" not in source
     assert "ctl.restart" not in source
     assert "setprop" not in source
+
+
+def test_oneui_artifact_checkers_cannot_issue_phone_or_shell_commands() -> None:
+    # Given
+    names = ("oneui_inventory.py", "oneui_inventory_core.py", "oneui_ledger.py")
+    source = "\n".join(
+        (ROOT / "skill" / "galaxy-control" / "scripts" / name).read_text() for name in names
+    )
+
+    # When / Then
+    assert "import subprocess" not in source
+    assert "galaxy_control.sh" not in source
+    assert "adb " not in source
+    assert "scrcpy" not in source
+    assert "shell=" not in source

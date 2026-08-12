@@ -1,0 +1,4 @@
+selection_index	item_id	app_name	target_folder	identity_evidence
+1	alpha	Alpha	Tools	visible:Alpha
+2	twin-a	Twin	Games	package:example.twin.a
+3	twin-b	Twin	Tools	package:example.twin.b

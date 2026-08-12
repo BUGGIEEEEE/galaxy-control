@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 SKILL_ROOT = Path(__file__).parent.parent / "skill" / "galaxy-control"
+REPOSITORY_ROOT = SKILL_ROOT.parent.parent
 
 
 def test_skill_manifest_is_bounded_and_names_the_skill() -> None:
@@ -51,6 +52,8 @@ def test_entry_scripts_are_executable_and_have_pep723_metadata() -> None:
         "galaxy_remote_adb.py",
         "galaxy_screen.py",
         "galaxy_setup.py",
+        "oneui_inventory.py",
+        "oneui_ledger.py",
         "openminis_client.py",
     )
 
@@ -60,3 +63,21 @@ def test_entry_scripts_are_executable_and_have_pep723_metadata() -> None:
         content = path.read_text()
         assert os.access(path, os.X_OK)
         assert content.startswith("#!/usr/bin/env -S uv run --script\n# /// script\n")
+
+
+def test_readme_embeds_all_privacy_clean_flow_diagrams() -> None:
+    # Given
+    content = (REPOSITORY_ROOT / "README.md").read_text()
+    expected = {
+        "docs/images/galaxy-flow-1.png",
+        "docs/images/galaxy-flow-2.png",
+        "docs/images/galaxy-flow-3.png",
+    }
+
+    # When
+    linked = set(re.findall(r"!\[[^]]+\]\((docs/images/galaxy-flow-[123]\.png)\)", content))
+
+    # Then
+    assert linked == expected
+    for relative in linked:
+        assert (REPOSITORY_ROOT / relative).read_bytes().startswith(b"\x89PNG\r\n\x1a\n")

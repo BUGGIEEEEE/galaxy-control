@@ -1,6 +1,6 @@
 interface:
   display_name: "Galaxy Control"
-  short_description: "Mac에서 Galaxy 연결·브리지·제어·검증"
-  default_prompt: "Use $galaxy-control to diagnose my setup and OpenMinis bridge, prepare only the approved private handoff if needed, choose one safe Galaxy control path, perform the minimum requested action, and verify the result independently."
+  short_description: "Mac에서 Galaxy 연결·One UI·제어·검증"
+  default_prompt: "Use $galaxy-control to diagnose my setup and OpenMinis bridge, prepare only the approved private handoff if needed, choose one safe Galaxy control path, use item-level evidence for One UI folder work, perform the minimum requested action, and verify the result independently."
 policy:
   allow_implicit_invocation: true

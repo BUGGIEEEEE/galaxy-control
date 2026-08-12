@@ -14,6 +14,24 @@ Codex + galaxy-control
 다른 적절한 경로로 결과 확인 후 다음 단계
 ```
 
+## 한눈에 보는 연동 구조
+
+### 1. Codex와 Galaxy가 동작하는 흐름
+
+![Codex와 Galaxy의 관찰·조작·검증 흐름](docs/images/galaxy-flow-1.png)
+
+### 2. 처음 연결하는 흐름
+
+![Mac과 Galaxy의 최초 설정 흐름](docs/images/galaxy-flow-2.png)
+
+### 3. Codex와 사용자가 맡는 단계
+
+![Galaxy 연결 설정의 Codex와 사용자 역할 구분](docs/images/galaxy-flow-3.png)
+
+그림은 역할과 순서를 설명하는 일반화 자료입니다. 실제 기기 serial, IP, 토큰, 페어링
+코드는 포함하지 않습니다. 페어링 포트와 연결 포트는 서로 다른 현재값이며, 6자리 페어링
+코드는 사용자가 ADB의 표준 입력에 직접 입력하고 채팅·파일·로그에 남기지 않습니다.
+
 ## 지원 범위
 
 - macOS
@@ -35,7 +53,7 @@ Galaxy 재부팅 후 완전
 공개 릴리스 태그를 고정해 내려받습니다.
 
 ```sh
-git clone --depth 1 --branch v0.2.1 https://github.com/BUGGIEEEEE/galaxy-control.git
+git clone --depth 1 --branch v0.3.0 https://github.com/BUGGIEEEEE/galaxy-control.git
 cd galaxy-control
 python3 scripts/install_skill.py --approved
 ```
@@ -46,12 +64,12 @@ python3 scripts/install_skill.py --approved
 
 ### 이미 v0.1.x 스킬이 설치된 사용자
 
-기존 스킬을 삭제·이동·덮어쓰지 않아도 브리지 준비를 먼저 진행할 수 있습니다. `v0.2.1`
+기존 스킬을 삭제·이동·덮어쓰지 않아도 브리지 준비를 먼저 진행할 수 있습니다. `v0.3.0`
 저장소를 별도 폴더에 내려받고, 아래처럼 **체크아웃 안의 배포용 스킬 경로**를 사용합니다.
 
 ```sh
-git clone --depth 1 --branch v0.2.1 https://github.com/BUGGIEEEEE/galaxy-control.git galaxy-control-v0.2.1
-cd galaxy-control-v0.2.1
+git clone --depth 1 --branch v0.3.0 https://github.com/BUGGIEEEEE/galaxy-control.git galaxy-control-v0.3.0
+cd galaxy-control-v0.3.0
 BRIDGE_RELEASE_ROOT="$PWD/skill/galaxy-control"
 
 uv run "$BRIDGE_RELEASE_ROOT/scripts/galaxy_bridge_package.py" doctor
@@ -61,7 +79,7 @@ uv run "$BRIDGE_RELEASE_ROOT/scripts/galaxy_bridge_package.py" \
 
 이 명령은 기존에 설치된 `~/.codex/skills/galaxy-control`을 수정하지 않습니다. 등록 프로필은
 기존 Application Support 위치에서 읽고, 새 개인화 인계 폴더만 만듭니다. 브리지 E2E 확인 후
-스킬 자체를 `v0.2.1`로 교체할지는 별도 작업으로 결정하세요. 설치기는 의도적으로 자동
+스킬 자체를 `v0.3.0`으로 교체할지는 별도 작업으로 결정하세요. 설치기는 의도적으로 자동
 업그레이드하지 않습니다.
 
 `uv`가 없는 새 Mac은 저장소 안의 표준 Python 부트스트랩으로 먼저 확인합니다.
@@ -152,6 +170,48 @@ uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_bridge_package.py" \
 [OpenMinis 브리지 배포 안내](skill/galaxy-control/references/openminis-bridge-distribution.md)를
 따릅니다.
 
+## One UI 앱 서랍·폴더 작업
+
+One UI의 폴더 선택기 한 곳만 읽으면 전체 앱 목록이 아닐 수 있습니다. 현재 폴더에 이미 든
+앱이 그 선택기에서 숨겨질 수 있기 때문입니다. 이 릴리스는 휴대전화를 자동 조작하지 않는
+두 가지 로컬 검증기를 제공합니다.
+
+```sh
+# 저장된 ui-dump JSONL을 읽어 한 선택기의 겹치는 구간을 재생
+uv run "$GALAXY_SKILL_ROOT/scripts/oneui_inventory.py" replay \
+  --input /ABSOLUTE/picker-a.jsonl \
+  --output /ABSOLUTE/NEW/picker-a-replay \
+  --capture-session CAPTURE_ID \
+  --source FOLDER_A
+
+# 같은 시점에 수집한 서로 다른 선택기 둘 이상을 합집합으로 검증
+uv run "$GALAXY_SKILL_ROOT/scripts/oneui_inventory.py" union \
+  --input /ABSOLUTE/NEW/picker-a-replay/app_selector_inventory.tsv \
+  --input /ABSOLUTE/NEW/picker-b-replay/app_selector_inventory.tsv \
+  --output /ABSOLUTE/NEW/inventory-union
+
+# 명세·선택 원장·진행 로그·화면의 선택 수를 함께 검증
+uv run "$GALAXY_SKILL_ROOT/scripts/oneui_ledger.py" check \
+  --manifest /ABSOLUTE/manifest.tsv \
+  --ledger /ABSOLUTE/selection-ledger.tsv \
+  --progress /ABSOLUTE/progress.tsv \
+  --selected-count N
+```
+
+핵심 규칙은 간단합니다.
+
+- `N개 선택됨`은 수량만 증명하고, 어떤 앱인지 증명하지 않습니다.
+- 선택 원장이 명세와 같고, 원장 행 수가 선택 수와 같아야 합니다.
+- 이동 성공은 `목표에 있음 + 소스에서 사라짐 + 예상 개수 일치`로 확인합니다.
+- 결과가 애매한 `완료`나 이동은 반복하지 않고 관찰 경로만 바꿉니다.
+- 앱 이동 뒤 페이지·좌표·폴더 위치는 다시 읽습니다.
+- 동명 앱 하나만 골라야 한다면 좌표가 아니라 패키지·컴포넌트 증거가 필요합니다.
+
+자세한 안전 가드는 [One UI launcher](skill/galaxy-control/references/oneui-launcher.md),
+[folder picker](skill/galaxy-control/references/oneui-folder-picker.md),
+[verification](skill/galaxy-control/references/verification.md)에 있습니다. 특정 세션의 앱 수,
+폴더 이름, 앱 분류, 좌표, 스크롤 거리는 배포 자료에 넣지 않습니다.
+
 ## 주요 인터페이스
 
 ```sh
@@ -172,8 +232,8 @@ uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_remote_adb.py" status
 uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_remote_adb.py" wireless-status
 ```
 
-모든 명령은 임의 옵션을 받지 않는 고정 프로필입니다. 페어링, `adb tcpip`, 네트워크·권한
-변경, 재부팅, 전송·결제·삭제는 별도의 명시적 승인이 필요합니다.
+위 One UI 절의 검사기도 임의 옵션을 받지 않는 고정 프로필입니다. 페어링, `adb tcpip`,
+네트워크·권한 변경, 재부팅, 전송·결제·삭제는 별도의 명시적 승인이 필요합니다.
 
 ## 배포 완성도
 

@@ -1,6 +1,6 @@
 ---
 name: "galaxy-control"
-description: "Inspect, set up, and safely control an enrolled Samsung Galaxy from Codex on macOS using a personalized fixed OpenMinis Control v2 bridge, fixed-profile scrcpy, and reviewed USB or wireless ADB paths. Use for Galaxy setup diagnosis, private bridge packaging, screen reading, Android navigation, verified UI changes, screen viewing/control/recording, ADB recovery, or independent result verification. Never install, update, activate, or reconcile the OpenMinis app."
+description: "Inspect, set up, and safely control an enrolled Samsung Galaxy from Codex on macOS using a personalized fixed OpenMinis Control v2 bridge, fixed-profile scrcpy, and reviewed USB or wireless ADB paths. Use for Galaxy setup diagnosis, private bridge packaging, screen reading, Android navigation, verified UI changes, One UI app-drawer or folder evidence, screen viewing/control/recording, ADB recovery, or independent result verification. Never install, update, activate, or reconcile the OpenMinis app."
 ---
 
 # Galaxy Control
@@ -78,6 +78,13 @@ logs or reports.
 Read [task-routing.md](references/task-routing.md) when more than one path is plausible. Never add a
 generic shell, arbitrary ADB command, arbitrary host, port scan, or arbitrary scrcpy option.
 
+For Samsung One UI app-drawer inventory, folder creation, or app moves, read both
+[oneui-launcher.md](references/oneui-launcher.md) and
+[oneui-folder-picker.md](references/oneui-folder-picker.md) before acting. A single folder picker is
+not a complete app inventory, a selected-count label proves quantity but not app identity, and every
+layout coordinate becomes stale after a launcher change. Use the local artifact checkers below to
+validate saved evidence; they never select, move, or otherwise control the phone.
+
 ## Apply the verification loop
 
 1. Observe immediately before acting.
@@ -90,6 +97,9 @@ generic shell, arbitrary ADB command, arbitrary host, port scan, or arbitrary sc
 Read [verification.md](references/verification.md) for every state-changing or consequential task.
 Opening scrcpy, receiving an HTTP 200, or returning an ADB success code is not proof of the user's
 requested outcome.
+
+For multi-app One UI work, also maintain an item-level selection ledger and progress log. Do not
+repeat an uncertain `Done` or move action. Re-observe the destination and source instead.
 
 ## Fixed command surfaces
 
@@ -120,6 +130,20 @@ record --output ABSOLUTE_NEW_MP4_OR_MKV [--serial LIVE_SERIAL] | stop
 ```
 
 Read [scrcpy-policy.md](references/scrcpy-policy.md) before `control`, `record`, or `stop`.
+
+Saved One UI evidence (local and read-only):
+
+```text
+oneui_inventory.py replay --input ABSOLUTE_JSONL --output ABSOLUTE_NEW_DIRECTORY \
+  --capture-session SAFE_ID --source SAFE_ID
+oneui_inventory.py union --input ABSOLUTE_TSV --input ABSOLUTE_TSV \
+  --output ABSOLUTE_NEW_DIRECTORY
+oneui_ledger.py check --manifest ABSOLUTE_TSV --ledger ABSOLUTE_TSV \
+  --progress ABSOLUTE_TSV --selected-count N
+```
+
+These profiles read saved dumps and TSV files only. They expose no OpenMinis, ADB, scrcpy, shell,
+selection, or completion action.
 
 ADB:
 

@@ -4,7 +4,7 @@ Read this file when `health`, `a11y-status`, or `shizuku-status` on port `43129`
 `network_error`, or when enrolling a new user whose Galaxy has only the regular OpenMinis app.
 
 If an older `galaxy-control` skill is already installed, do not overwrite it merely to build the
-bridge. A pinned `v0.2.1` repository checkout may run its own
+bridge. A pinned `v0.3.0` repository checkout may run its own
 `skill/galaxy-control/scripts/galaxy_bridge_package.py` directly. It reads the same private
 Application Support profile and changes only the explicitly approved new output directory.
 

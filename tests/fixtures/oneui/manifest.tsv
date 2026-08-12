@@ -1,0 +1,4 @@
+item_id	app_name	target_folder	identity_evidence
+alpha	Alpha	Tools	visible:Alpha
+twin-a	Twin	Games	package:example.twin.a
+twin-b	Twin	Tools	package:example.twin.b

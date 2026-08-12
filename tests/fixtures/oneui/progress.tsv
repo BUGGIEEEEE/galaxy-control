@@ -1,0 +1,4 @@
+item_id	app_name	target_folder	status	destination_present	source_absent	expected_count_ok
+alpha	Alpha	Tools	completed	true	true	true
+twin-a	Twin	Games	completed	true	true	true
+twin-b	Twin	Tools	pending	false	false	false
