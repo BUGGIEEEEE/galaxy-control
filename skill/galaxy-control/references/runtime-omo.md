@@ -11,7 +11,9 @@ Use this canonical skill directly. Do not maintain a second OmO adapter.
    uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py" all
    ```
 
-2. If the enrolled ADB transport is unavailable and the private profile records the user's
+2. If ADB is unavailable and `steady_adb_enabled: true`, try the profile's fixed `connect` once.
+   Success is final only after serial, model, and current boot identity verification.
+3. If the fixed endpoint is unavailable and the profile records the user's
    `enable-auto-reconnect --approved` opt-in, make one already-paired recovery attempt:
 
    ```sh
@@ -20,11 +22,16 @@ Use this canonical skill directly. Do not maintain a second OmO adapter.
 
    The executable enforces the persisted opt-in before any ADB call. The action reuses an existing
    verified transport before mDNS discovery. It never pairs or scans.
-   If it returns `connection_port_required`, ask for Android's currently displayed connection port.
-   Do not block an OpenMinis-only task when ADB remains unavailable.
-3. Run `galaxy_screen.py doctor` after ADB becomes available. Treat `preflight_ready` as no-launch
+   If it returns `connection_port_required`, use healthy OpenMinis read-only observation to confirm
+   Wi-Fi and read Android Settings → Wireless Debugging → IP address & port. Pass only the current
+   port to `wireless-connect --port`; ask the user only when that read-only path is unavailable.
+4. When `steady_adb_enabled: true`, treat the verified dynamic endpoint as bootstrap-only. Run
+   `legacy-enable-from-wireless --port CURRENT_CONNECTION_PORT --approved`, then fixed `connect`
+   and `galaxy_doctor.py adb`. The final selected endpoint must be the profile's `:5555` endpoint.
+5. Run `galaxy_screen.py doctor` only after the profile's final ADB state is verified. Treat
+   `preflight_ready` as no-launch
    compatibility evidence only; `launch_verified` remains false.
-4. Classify the requested operation. For later tasks in the same valid session, run only the
+6. Classify the requested operation. For later tasks in the same valid session, run only the
    matching read-only preflight:
 
    ```sh
@@ -33,12 +40,12 @@ Use this canonical skill directly. Do not maintain a second OmO adapter.
    uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py" scrcpy
    ```
 
-5. Use `result.checked_paths`, `result.control_paths`, and `result.reuse`.
-6. Reuse a successful preflight only in the current OmO agent session. Never write live readiness
+7. Use `result.checked_paths`, `result.control_paths`, and `result.reuse`.
+8. Reuse a successful preflight only in the current OmO agent session. Never write live readiness
    to disk. Invalidate it after a device reboot, network change, bridge or ADB error, or scrcpy
    process death.
-7. Perform one minimum action through the selected fixed adapter.
-8. Read the action adapter's `result.route`. If `result.route.verification_required` is true,
+9. Perform one minimum action through the selected fixed adapter.
+10. Read the action adapter's `result.route`. If `result.route.verification_required` is true,
    freshly verify through one of `result.route.verify_with`; prefer a different path when it
    materially improves confidence.
 

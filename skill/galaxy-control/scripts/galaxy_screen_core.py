@@ -91,10 +91,12 @@ def parse_request(argv: tuple[str, ...]) -> ScreenRequest:
 
 
 def _serial_matches(profile: DeviceProfile, serial: str) -> bool:
+    if profile.steady_adb_enabled:
+        return serial == profile.steady_endpoint
     if serial == profile.physical_serial:
         return True
     if serial.startswith(f"{profile.tailscale_ipv4}:"):
-        return serial != profile.steady_endpoint or profile.steady_adb_enabled
+        return serial != profile.steady_endpoint
     return serial.startswith(f"adb-{profile.physical_serial}-")
 
 
