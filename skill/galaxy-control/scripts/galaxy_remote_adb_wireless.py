@@ -8,11 +8,20 @@ from dataclasses import dataclass
 from enum import StrEnum, unique
 from typing import Final, NewType, assert_never
 
-from galaxy_adb import AdbError, AdbRuntime, adb_path, list_devices, run_adb, verify_endpoint
+from galaxy_adb import (
+    AdbDevice,
+    AdbError,
+    AdbRuntime,
+    adb_path,
+    list_devices,
+    run_adb,
+    verify_endpoint,
+)
 from galaxy_process import JsonObject, RouteMetadata, error_envelope, success_envelope, with_route
 from galaxy_wireless_state import WirelessState, load_state, profile_hash, write_state
 
 PAIR_CODE_PATTERN: Final = re.compile(r"^[0-9]{6}$")
+MDNS_CONNECT_SERVICE: Final = "_adb-tls-connect._tcp"
 ConnectionPort = NewType("ConnectionPort", int)
 
 
@@ -20,6 +29,7 @@ ConnectionPort = NewType("ConnectionPort", int)
 class WirelessAction(StrEnum):
     DOCTOR = "wireless-doctor"
     STATUS = "wireless-status"
+    PREPARE = "wireless-prepare"
     PAIR = "wireless-pair"
     CONNECT = "wireless-connect"
     DISCONNECT = "wireless-disconnect"
@@ -47,6 +57,34 @@ def _port(raw: str, code: str) -> ConnectionPort:
     return ConnectionPort(port)
 
 
+def parse_mdns_connection_ports(
+    raw: str,
+    physical_serial: str,
+) -> tuple[ConnectionPort, ...]:
+    """Return unique dynamic ports for the enrolled Galaxy's connect service."""
+    service_prefix = f"adb-{physical_serial}-"
+    ports: set[int] = set()
+    for line in raw.splitlines():
+        fields = line.split()
+        if len(fields) != 3:
+            continue
+        service_name, service_type, advertised_endpoint = fields
+        if (
+            not service_name.startswith(service_prefix)
+            or service_type.removesuffix(".") != MDNS_CONNECT_SERVICE
+        ):
+            continue
+        host, separator, raw_port = advertised_endpoint.rpartition(":")
+        if not separator or not host:
+            continue
+        try:
+            port = _port(raw_port, "connection_port_invalid")
+        except AdbError:
+            continue
+        ports.add(int(port))
+    return tuple(ConnectionPort(port) for port in sorted(ports))
+
+
 def parse_request(argv: Sequence[str]) -> WirelessRequest:
     """Parse exact dynamic-port profiles without accepting host or serial input."""
     match tuple(argv):  # noqa: V001  # noqa: MATCH_OK -- reject unknown forms.
@@ -54,6 +92,10 @@ def parse_request(argv: Sequence[str]) -> WirelessRequest:
             return WirelessRequest(WirelessAction.DOCTOR)
         case ("wireless-status",):
             return WirelessRequest(WirelessAction.STATUS)
+        case ("wireless-prepare", "--approved"):
+            return WirelessRequest(WirelessAction.PREPARE, approved=True)
+        case ("wireless-prepare",):
+            return WirelessRequest(WirelessAction.PREPARE)
         case ("wireless-pair", "--port", raw, "--approved"):
             return WirelessRequest(
                 WirelessAction.PAIR,
@@ -89,15 +131,25 @@ def _required_port(request: WirelessRequest) -> ConnectionPort:
     return request.port
 
 
-def _status(runtime: AdbRuntime) -> JsonObject:
-    devices = list_devices(runtime)
-    expected = tuple(
+def _enrolled_devices(
+    runtime: AdbRuntime,
+    devices: tuple[AdbDevice, ...],
+) -> tuple[AdbDevice, ...]:
+    return tuple(
         device
         for device in devices
         if device.serial == runtime.profile.physical_serial
         or device.serial.startswith(f"adb-{runtime.profile.physical_serial}-")
-        or device.serial.startswith(f"{runtime.profile.tailscale_ipv4}:")
+        or (
+            device.serial.startswith(f"{runtime.profile.tailscale_ipv4}:")
+            and device.serial != f"{runtime.profile.tailscale_ipv4}:5555"
+        )
     )
+
+
+def _status(runtime: AdbRuntime) -> JsonObject:
+    devices = list_devices(runtime)
+    expected = _enrolled_devices(runtime, devices)
     cached = load_state(runtime.profile)
     return {
         "steady_adb_enabled": runtime.profile.steady_adb_enabled,
@@ -112,6 +164,76 @@ def _status(runtime: AdbRuntime) -> JsonObject:
             }
             for device in expected
         ],
+    }
+
+
+def _prepare(request: WirelessRequest, runtime: AdbRuntime) -> JsonObject:
+    if not request.approved:
+        raise AdbError(
+            "approval_required",
+            "paired ADB reconnect requires current-request approval",
+        )
+    if not runtime.profile.auto_reconnect_adb_enabled:
+        raise AdbError(
+            "auto_reconnect_disabled",
+            "paired ADB reconnect is not enabled in this profile",
+        )
+    if not runtime.profile.auto_reconnect_adb_enabled:
+        raise AdbError(
+            "auto_reconnect_disabled",
+            "paired ADB reconnect is not enabled in this profile",
+        )
+    expected = _enrolled_devices(runtime, list_devices(runtime))
+    if len(expected) > 1:
+        raise AdbError(
+            "duplicate_transports",
+            "multiple enrolled Galaxy transports require review",
+        )
+    if expected:
+        selected = next(iter(expected))
+        verified = verify_endpoint(runtime, selected.serial, include_boot=True)
+        return {
+            "ready": True,
+            "reused": True,
+            "endpoint": verified.endpoint,
+            "model": verified.model,
+            "device_serial": verified.physical_serial,
+            "boot_session_hash": verified.boot_session_hash,
+            "transport": "adb_usb" if selected.transport == "usb" else "adb_tcpip",
+        }
+    discovery = run_adb(runtime, (adb_path(runtime), "mdns", "services"))
+    if not discovery.succeeded:
+        raise AdbError(
+            "connection_port_required",
+            "current Wireless Debugging connection port is required",
+        )
+    ports = parse_mdns_connection_ports(
+        discovery.stdout,
+        runtime.profile.physical_serial,
+    )
+    if not ports:
+        raise AdbError(
+            "connection_port_required",
+            "current Wireless Debugging connection port is required",
+        )
+    if len(ports) > 1:
+        raise AdbError(
+            "mdns_ambiguous",
+            "multiple enrolled Wireless Debugging ports require review",
+        )
+    selected_port = next(iter(ports))
+    connect_request = WirelessRequest(
+        WirelessAction.CONNECT,
+        selected_port,
+        approved=True,
+    )
+    connected = _connect(connect_request, runtime)
+    return {
+        **connected,
+        "ready": True,
+        "reused": False,
+        "discovery": "adb_mdns",
+        "transport": "adb_tcpip",
     }
 
 
@@ -148,14 +270,37 @@ def _connect(request: WirelessRequest, runtime: AdbRuntime) -> JsonObject:
     if request.action is WirelessAction.RECOVER and (cached is None or cached.endpoint != selected):
         raise AdbError("boot_session_required", "recover requires matching cached state")
     response = run_adb(runtime, (adb_path(runtime), "connect", selected))
-    if not response.succeeded:
+    output = response.stdout.strip().lower()
+    if (
+        not response.succeeded
+        or "failed" in output
+        or "cannot" in output
+        or not (
+            output == "connected" or output.startswith(("connected to ", "already connected to "))
+        )
+    ):
         raise AdbError("adb_connect_failed", "wireless endpoint connection failed")
-    verified = _verified_state(runtime, port)
+    try:
+        verified = _verified_state(runtime, port)
+    except AdbError as verification_error:
+        cleanup = run_adb(runtime, (adb_path(runtime), "disconnect", selected))
+        if not cleanup.succeeded:
+            raise AdbError(
+                "unverified_endpoint_cleanup_failed",
+                "unverified ADB endpoint could not be disconnected",
+            ) from verification_error
+        raise
     if (
         cached is not None
         and request.action is WirelessAction.RECOVER
         and cached.boot_session_hash != verified.boot_session_hash
     ):
+        cleanup = run_adb(runtime, (adb_path(runtime), "disconnect", selected))
+        if not cleanup.succeeded:
+            raise AdbError(
+                "unverified_endpoint_cleanup_failed",
+                "mismatched ADB endpoint could not be disconnected",
+            )
         raise AdbError("boot_session_mismatch", "cached endpoint belongs to another boot")
     if request.action is WirelessAction.CONNECT:
         if cached is not None and cached.endpoint != selected:
@@ -215,6 +360,8 @@ def execute_wireless(argv: Sequence[str], runtime: AdbRuntime) -> tuple[JsonObje
         match request.action:
             case WirelessAction.DOCTOR | WirelessAction.STATUS:
                 result = _status(runtime)
+            case WirelessAction.PREPARE:
+                result = _prepare(request, runtime)
             case WirelessAction.PAIR:
                 result = _pair(request, runtime)
             case WirelessAction.CONNECT | WirelessAction.RECOVER:
@@ -229,6 +376,7 @@ def execute_wireless(argv: Sequence[str], runtime: AdbRuntime) -> tuple[JsonObje
         return error_envelope(action, error.code, error.message), 1
     mutating = request.action in {
         WirelessAction.PAIR,
+        WirelessAction.PREPARE,
         WirelessAction.CONNECT,
         WirelessAction.RECOVER,
         WirelessAction.LEGACY_ENABLE,
@@ -242,12 +390,18 @@ def execute_wireless(argv: Sequence[str], runtime: AdbRuntime) -> tuple[JsonObje
                 transport_value = item.get("transport")
                 if isinstance(transport_value, str):
                     observed_transports.add(transport_value)
-    transport = (
-        "adb_usb"
-        if request.action in {WirelessAction.DOCTOR, WirelessAction.STATUS}
-        and observed_transports == {"usb"}
-        else "adb_tcpip"
-    )
+    declared_transport = result.get("transport")
+    if declared_transport == "adb_usb":
+        transport = "adb_usb"
+    elif declared_transport == "adb_tcpip":
+        transport = "adb_tcpip"
+    elif request.action in {
+        WirelessAction.DOCTOR,
+        WirelessAction.STATUS,
+    } and observed_transports == {"usb"}:
+        transport = "adb_usb"
+    else:
+        transport = "adb_tcpip"
     routed = with_route(
         result,
         RouteMetadata(
@@ -257,6 +411,7 @@ def execute_wireless(argv: Sequence[str], runtime: AdbRuntime) -> tuple[JsonObje
             if request.action
             in {
                 WirelessAction.PAIR,
+                WirelessAction.PREPARE,
                 WirelessAction.CONNECT,
                 WirelessAction.RECOVER,
                 WirelessAction.DISCONNECT,

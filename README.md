@@ -7,7 +7,8 @@ macOS의 Codex가 Samsung Galaxy를 **관찰 → 최소 조작 → 독립 검증
 사용자 요청
    ↓
 Codex + galaxy-control
-   ├─ 작업 유형 판단 → 관련 경로만 사전검사
+   ├─ 세션 최초 전체 진단 → 기존 페어링 ADB 복구 시도
+   ├─ 후속 작업 유형 판단 → 관련 경로만 사전검사
    ├─ OpenMinis ─ 의미·글자·버튼 관찰과 반복 가능한 조작
    ├─ scrcpy ──── 실시간 화면, 드래그, 회전, 복합 제스처
    └─ ADB/Shizuku ─ 기기 신원·연결·시스템 사실
@@ -33,7 +34,9 @@ Codex + galaxy-control
 코드는 포함하지 않습니다. 페어링 포트와 연결 포트는 서로 다른 현재값이며, 6자리 페어링
 코드는 사용자가 ADB의 표준 입력에 직접 입력하고 채팅·파일·로그에 남기지 않습니다.
 사전검사 결과는 현재 에이전트 세션에서만 재사용되고 디스크에 저장되지 않습니다. 최초
-기기 등록은 ADB 목록에서 물리적인 `usb:` 연결이 확인된 Galaxy만 허용합니다.
+세션 준비는 ADB가 없을 때 등록된 mDNS 서비스 하나로 기존 페어링 연결을 한 번 복구하고,
+실패해도 OpenMinis 경로를 차단하지 않습니다. 최초 기기 등록은 ADB 목록에서 물리적인
+`usb:` 연결이 확인된 Galaxy만 허용합니다.
 
 ## 지원 범위
 
@@ -56,23 +59,32 @@ Galaxy 재부팅 후 완전
 공개 릴리스 태그를 고정해 내려받습니다.
 
 ```sh
-git clone --depth 1 --branch v0.4.0 https://github.com/BUGGIEEEEE/galaxy-control.git
+git clone --depth 1 --branch v0.5.0 https://github.com/BUGGIEEEEE/galaxy-control.git
 cd galaxy-control
 python3 scripts/install_skill.py --approved
 ```
 
-설치기는 기존 `galaxy-control` 스킬을 덮어쓰지 않습니다. 이미 설치되어 있으면 중단하므로
-기존 스킬의 백업·교체 여부를 사용자가 먼저 결정해야 합니다. 설치 뒤 Codex를 새로 열고
-`$galaxy-control`을 호출합니다.
+새 설치에는 위 명령을 사용합니다. 기존 설치를 승인된 최신 릴리스로 교체할 때는 다음
+원자적 업그레이드 명령을 사용합니다.
 
-### 이미 v0.1.x 스킬이 설치된 사용자
+```sh
+python3 scripts/install_skill.py --upgrade --approved
+```
 
-기존 스킬을 삭제·이동·덮어쓰지 않아도 브리지 준비를 먼저 진행할 수 있습니다. `v0.4.0`
+업그레이드는 새 스킬을 먼저 별도 경로에 복사한 뒤 기존 설치를 비공개
+`.galaxy-control-backups` 디렉터리로 이동하고 새 버전을 활성화합니다. 활성화에 실패하면
+기존 설치를 즉시 복구하며, 성공한 경우 출력된 백업 경로를 수동 롤백용으로 유지합니다.
+Application Support의 기기 프로필과 ADB 키는 스킬 디렉터리 밖에 있으므로 변경하지
+않습니다. 설치 뒤 Codex를 새로 열고 `$galaxy-control`을 호출합니다.
+
+### 기존 스킬이 설치된 사용자
+
+기존 스킬을 삭제·이동·덮어쓰지 않아도 브리지 준비를 먼저 진행할 수 있습니다. `v0.5.0`
 저장소를 별도 폴더에 내려받고, 아래처럼 **체크아웃 안의 배포용 스킬 경로**를 사용합니다.
 
 ```sh
-git clone --depth 1 --branch v0.4.0 https://github.com/BUGGIEEEEE/galaxy-control.git galaxy-control-v0.4.0
-cd galaxy-control-v0.4.0
+git clone --depth 1 --branch v0.5.0 https://github.com/BUGGIEEEEE/galaxy-control.git galaxy-control-v0.5.0
+cd galaxy-control-v0.5.0
 BRIDGE_RELEASE_ROOT="$PWD/skill/galaxy-control"
 
 uv run "$BRIDGE_RELEASE_ROOT/scripts/galaxy_bridge_package.py" doctor
@@ -82,7 +94,7 @@ uv run "$BRIDGE_RELEASE_ROOT/scripts/galaxy_bridge_package.py" \
 
 이 명령은 기존에 설치된 `~/.codex/skills/galaxy-control`을 수정하지 않습니다. 등록 프로필은
 기존 Application Support 위치에서 읽고, 새 개인화 인계 폴더만 만듭니다. 브리지 E2E 확인 후
-스킬 자체를 `v0.4.0`로 교체할지는 별도 작업으로 결정하세요. 설치기는 의도적으로 자동
+스킬 자체를 `v0.5.0`로 교체할지는 별도 작업으로 결정하세요. 설치기는 의도적으로 자동
 업그레이드하지 않습니다.
 
 `uv`가 없는 새 Mac은 저장소 안의 표준 Python 부트스트랩으로 먼저 확인합니다.
@@ -123,6 +135,15 @@ uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py" openminis
 uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py" adb
 uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py" scrcpy
 ```
+
+최초 세션에서 이미 페어링된 ADB를 자동 복구하려면 한 번 명시적으로 opt-in합니다.
+
+```sh
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_setup.py" enable-auto-reconnect --approved
+```
+
+언제든 `disable-auto-reconnect --approved`로 해제할 수 있습니다. 이 설정은 자동 페어링,
+Wireless Debugging 변경, 포트 검색 또는 고정 TCP ADB를 허용하지 않습니다.
 
 두 대 이상이면 doctor의 현재 목록에서 정확한 대상을 고른 뒤
 `enroll --serial LIVE_SERIAL --approved`를 사용합니다. 등록 정보는 Git 저장소가 아니라
@@ -168,6 +189,31 @@ uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_bridge_package.py" \
 "$GALAXY_SKILL_ROOT/scripts/galaxy_control.sh" a11y-status
 "$GALAXY_SKILL_ROOT/scripts/galaxy_control.sh" ui-info
 ```
+
+## 재부팅 뒤 세션 준비
+
+사용자는 Galaxy 잠금을 해제하고 Wi-Fi·Tailscale, OpenMinis Control v2 브리지, 필요한
+Shizuku 권한을 준비합니다. 그 뒤 Galaxy Control의 첫 작업은 다음 순서를 자동으로
+수행합니다.
+
+```sh
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py" all
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_remote_adb.py" wireless-prepare --approved
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_screen.py" doctor
+```
+
+`wireless-prepare`는 프로필에서 opt-in한 기존 페어링 재연결 한 번만 수행합니다. 이미
+정확한 기기가 연결되어 있으면 재연결하지 않습니다. ADB 자체가 페어링된 mDNS 서비스를
+먼저 연결한 경우에도 시리얼·모델·부팅 ID를 다시 읽어 검증합니다. 그렇지 않으면 Mac의
+`adb mdns services`에서
+등록 시리얼의 `_adb-tls-connect._tcp` 포트 하나만 받아 등록된 Galaxy Tailscale 주소로
+연결하고 시리얼·모델·현재 부팅 ID를 검증합니다. mDNS가 닿지 않으면 포트를 추측하거나
+검색하지 않고 Android에 표시된 현재 연결 포트를 요청합니다.
+
+scrcpy doctor는 프로세스나 창을 시작하지 않습니다. `preflight_ready: true`는 ADB 대상,
+scrcpy 설치와 안전 옵션 호환성만 뜻하며 실제 시작 여부는 `launch_verified: false`입니다.
+ADB 복구 실패는 ADB·scrcpy 기능만 제한하고 정상인 OpenMinis UI 제어는 계속 사용할 수
+있습니다. 같은 세션의 후속 작업은 필요한 경로만 선택적으로 다시 검사합니다.
 
 개인화 설치 파일에는 두 Tailscale 주소가 들어 있으므로 GitHub, 메신저, 공개 이슈에 올리지
 않고 대상 Galaxy의 Minis에만 전달합니다. 토큰은 Galaxy에서 설치할 때 새로 생성되며 출력되지

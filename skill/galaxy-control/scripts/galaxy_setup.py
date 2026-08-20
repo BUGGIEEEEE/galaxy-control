@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Final
 
 from galaxy_process import JsonObject, error_envelope, run_command, success_envelope
-from galaxy_profile import ProfileError, load_profile, set_steady_adb
+from galaxy_profile import ProfileError, load_profile, set_auto_reconnect_adb, set_steady_adb
 from galaxy_setup_core import SetupError, SetupRuntime, apply_plan, build_plan, enroll
 
 TAILSCALE_APP_CLI: Final = Path("/Applications/Tailscale.app/Contents/MacOS/Tailscale")
@@ -68,6 +68,7 @@ def _doctor_result(runtime: SetupRuntime) -> JsonObject:
             "enrolled": True,
             "expected_model": profile.expected_model,
             "steady_adb_enabled": profile.steady_adb_enabled,
+            "auto_reconnect_adb_enabled": profile.auto_reconnect_adb_enabled,
         }
     result["computer_use"] = {"requires_live_permission_test": True}
     return result
@@ -80,6 +81,7 @@ def _show_profile() -> JsonObject:
         "expected_model": profile.expected_model,
         "openminis_port": profile.openminis_port,
         "steady_adb_enabled": profile.steady_adb_enabled,
+        "auto_reconnect_adb_enabled": profile.auto_reconnect_adb_enabled,
         "device_identifiers_redacted": True,
     }
 
@@ -131,6 +133,21 @@ def execute(argv: Sequence[str], runtime: SetupRuntime) -> tuple[JsonObject, int
             case ("disable-steady-adb", "--approved"):
                 profile = set_steady_adb(False)
                 result = {"steady_adb_enabled": profile.steady_adb_enabled}
+            case ("enable-auto-reconnect",) | ("disable-auto-reconnect",):
+                raise SetupError(
+                    "approval_required",
+                    "this changes the paired ADB reconnect preference",
+                )
+            case ("enable-auto-reconnect", "--approved"):
+                profile = set_auto_reconnect_adb(True)
+                result = {
+                    "auto_reconnect_adb_enabled": profile.auto_reconnect_adb_enabled,
+                }
+            case ("disable-auto-reconnect", "--approved"):
+                profile = set_auto_reconnect_adb(False)
+                result = {
+                    "auto_reconnect_adb_enabled": profile.auto_reconnect_adb_enabled,
+                }
             case _:
                 raise SetupError("invalid_request", "unsupported setup command or option")
     except (SetupError, ProfileError) as error:

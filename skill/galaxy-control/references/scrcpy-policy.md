@@ -2,6 +2,10 @@
 
 `galaxy_screen.py` accepts fixed profiles only.
 
+- `doctor`: reads the current ADB list, selects exactly one enrolled transport while ignoring
+  unrelated devices, and checks the installed scrcpy `--help` for every required safe option. It
+  never creates the private app wrapper or starts scrcpy. `preflight_ready: true` therefore always
+  includes `launch_verified: false`.
 - `view`: exact serial, `--no-control`, `--no-audio`, and no clipboard autosync. It is the default
   read-only live view.
 - `control`: exact serial, no audio, and no clipboard autosync. Use only for a requested live

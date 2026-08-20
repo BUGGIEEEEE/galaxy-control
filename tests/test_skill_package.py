@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+import tomllib
 from pathlib import Path
 
 SKILL_ROOT = Path(__file__).parent.parent / "skill" / "galaxy-control"
@@ -20,6 +21,14 @@ def test_skill_manifest_is_bounded_and_names_the_skill() -> None:
     assert 'name: "galaxy-control"' in frontmatter.group(1)
     assert "description:" in frontmatter.group(1)
     assert len(content.splitlines()) < 500
+
+
+def test_skill_version_matches_distribution_version() -> None:
+    # Given
+    metadata = tomllib.loads((REPOSITORY_ROOT / "pyproject.toml").read_text())
+
+    # When / Then
+    assert (SKILL_ROOT / "VERSION").read_text().strip() == metadata["project"]["version"]
 
 
 def test_every_reference_linked_from_skill_exists() -> None:
@@ -42,9 +51,17 @@ def test_agent_metadata_mentions_explicit_skill_prompt() -> None:
     assert 'display_name: "Galaxy Control"' in content
     assert "$galaxy-control" in content
     assert "allow_implicit_invocation: true" in content
+    assert 'session: ["scripts/galaxy_doctor.py", "all"]' in content
     assert 'openminis: ["scripts/galaxy_doctor.py", "openminis"]' in content
     assert 'adb: ["scripts/galaxy_doctor.py", "adb"]' in content
     assert 'scrcpy: ["scripts/galaxy_doctor.py", "scrcpy"]' in content
+    assert (
+        'paired_adb_prepare: ["scripts/galaxy_remote_adb.py", "wireless-prepare", "--approved"]'
+    ) in content
+    assert (
+        'paired_adb_opt_in: ["scripts/galaxy_setup.py", "enable-auto-reconnect", "--approved"]'
+    ) in content
+    assert 'scrcpy_launch_check: ["scripts/galaxy_screen.py", "doctor"]' in content
     assert 'session_reuse: "memory_only"' in content
     assert 'result_route_field: "result.route"' in content
 

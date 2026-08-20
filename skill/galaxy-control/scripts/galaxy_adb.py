@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -77,7 +78,7 @@ def parse_devices(raw: str) -> tuple[AdbDevice, ...]:
         if len(fields) < 2:
             continue
         attributes = dict(field.split(":", 1) for field in fields[2:] if ":" in field)
-        transport = "tcpip" if ":" in fields[0] else "usb"
+        transport = "tcpip" if ":" in fields[0] or fields[0].startswith("adb-") else "usb"
         devices.append(AdbDevice(fields[0], fields[1], transport, attributes.get("model")))
     return tuple(devices)
 
@@ -123,9 +124,13 @@ def verify_endpoint(runtime: AdbRuntime, endpoint: str, *, include_boot: bool) -
             (adb, "-s", endpoint, "shell", "cat", "/proc/sys/kernel/random/boot_id"),
         )
         boot_id = boot.stdout.strip()
-        if not boot.succeeded or len(boot_id) != 36:
+        try:
+            parsed_boot_id = uuid.UUID(boot_id)
+        except ValueError:
+            parsed_boot_id = None
+        if not boot.succeeded or parsed_boot_id is None or str(parsed_boot_id) != boot_id.lower():
             raise AdbError("boot_session_unavailable", "boot session could not be verified")
-        boot_hash = hashlib.sha256(boot_id.encode()).hexdigest()
+        boot_hash = hashlib.sha256(str(parsed_boot_id).encode()).hexdigest()
     return VerifiedDevice(
         endpoint, serial.stdout.strip(), runtime.profile.expected_model, boot_hash
     )

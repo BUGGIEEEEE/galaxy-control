@@ -22,7 +22,7 @@ import sys
 from collections.abc import Sequence
 from typing import assert_never
 
-from galaxy_adb import AdbRuntime
+from galaxy_adb import AdbError, AdbRuntime
 from galaxy_process import (
     JsonObject,
     RouteMetadata,
@@ -62,7 +62,7 @@ def execute(argv: Sequence[str], runtime: ScreenRuntime) -> tuple[JsonObject, in
                 result = start(request, runtime)
             case unreachable:
                 assert_never(unreachable)
-    except ScreenError as error:
+    except (AdbError, ScreenError) as error:
         return error_envelope(action, error.code, error.message), 1
     routed = with_route(
         result,

@@ -44,8 +44,20 @@ def profile() -> DeviceProfile:
 def bridge(request: BridgeRequest) -> SuccessResponse:
     payloads = {
         Action.HEALTH: {"status": "ok"},
-        Action.A11Y_STATUS: {"running": True, "capabilities": ["performGestures"]},
-        Action.SHIZUKU_STATUS: {"state": "READY", "running": True, "authorized": True},
+        Action.A11Y_STATUS: {
+            "ok": True,
+            "data": {"running": True, "capabilities": ["performGestures"]},
+            "route": {"controller": "openminis"},
+        },
+        Action.SHIZUKU_STATUS: {
+            "ok": True,
+            "data": {
+                "state": "READY",
+                "running": True,
+                "authorized": True,
+            },
+            "route": {"controller": "openminis"},
+        },
     }
     return SuccessResponse(ok=True, action=request.action, result=payloads[request.action])
 
@@ -140,6 +152,32 @@ def test_doctor_marks_live_different_model_as_mismatch() -> None:
     assert report["adb"]["error"] == "device_mismatch"
     assert report["control_paths"]["adb"] is False
     assert report["control_paths"]["scrcpy"] is False
+
+
+def test_doctor_requires_running_accessibility_service() -> None:
+    # Given
+    def stopped_accessibility(request: BridgeRequest) -> SuccessResponse:
+        response = bridge(request)
+        if request.action is not Action.A11Y_STATUS:
+            return response
+        return SuccessResponse(
+            ok=True,
+            action=request.action,
+            result={
+                "ok": True,
+                "data": {"running": False, "capabilities": []},
+                "route": {"controller": "openminis"},
+            },
+        )
+
+    runtime = DoctorRuntime(profile(), FakeRunner([]), paths, stopped_accessibility)
+
+    # When
+    report = inspect_device(runtime, target=PreflightTarget.OPENMINIS)
+
+    # Then
+    assert report["status"] == "BLOCKED"
+    assert report["control_paths"] == {"openminis": False}
 
 
 def test_doctor_bridge_callable_has_typed_contract() -> None:
@@ -251,7 +289,7 @@ def test_adb_preflight_verifies_physical_serial_behind_remote_transport() -> Non
     runner = FakeRunner(
         [
             result("Android Debug Bridge version 1.0.41\n"),
-            result("List of devices attached\n100.64.1.20:5555 device model:SM_S921B\n"),
+            result("List of devices attached\n100.64.1.20:32002 device model:SM_S921B\n"),
             result("DEMO123456\n"),
         ]
     )
@@ -265,11 +303,57 @@ def test_adb_preflight_verifies_physical_serial_behind_remote_transport() -> Non
     assert runner.calls[-1] == (
         "/opt/homebrew/bin/adb",
         "-s",
-        "100.64.1.20:5555",
+        "100.64.1.20:32002",
         "shell",
         "getprop",
         "ro.serialno",
     )
+
+
+def test_adb_preflight_rejects_disabled_fixed_tcp_transport() -> None:
+    # Given
+    runner = FakeRunner(
+        [
+            result("Android Debug Bridge version 1.0.41\n"),
+            result("List of devices attached\n100.64.1.20:5555 device model:SM_S921B\n"),
+        ]
+    )
+
+    # When
+    report = inspect_device(
+        DoctorRuntime(profile(), runner, paths, bridge),
+        target=PreflightTarget.ADB,
+    )
+
+    # Then
+    assert report["status"] == "BLOCKED"
+    assert report["control_paths"] == {"adb": False}
+    assert len(runner.calls) == 2
+
+
+def test_adb_preflight_accepts_verified_native_mdns_alias() -> None:
+    # Given
+    native_serial = "adb-DEMO123456-live._adb-tls-connect._tcp"
+    runner = FakeRunner(
+        [
+            result("Android Debug Bridge version 1.0.41\n"),
+            result(
+                f"List of devices attached\n{native_serial} device model:SM_S921B transport_id:1\n"
+            ),
+            result("DEMO123456\n"),
+        ]
+    )
+
+    # When
+    report = inspect_device(
+        DoctorRuntime(profile(), runner, paths, bridge),
+        target=PreflightTarget.ADB,
+    )
+
+    # Then
+    assert report["status"] == "READY"
+    assert report["control_paths"] == {"adb": True}
+    assert report["adb"]["devices"][0]["transport"] == "tcpip"
 
 
 def test_doctor_cli_accepts_only_fixed_preflight_targets() -> None:

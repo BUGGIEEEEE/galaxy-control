@@ -11,8 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, cast
 
-from galaxy_adb import AdbError, AdbRuntime, list_devices
-from galaxy_process import JsonObject, Runner, run_command
+from galaxy_adb import AdbError, AdbRuntime, list_devices, verify_endpoint
+from galaxy_process import JsonObject, JsonValue, Runner, run_command
 from galaxy_recording import (
     RecordingPaths,
     cleanup_recording,
@@ -25,6 +25,7 @@ from galaxy_screen_core import (
     ScreenRequest,
     build_scrcpy_argv,
     select_device,
+    select_enrolled_device,
 )
 from galaxy_screen_state import (
     ProcessIdentity,
@@ -48,6 +49,15 @@ REQUIRED_OPTIONS: Final = (
     "--no-playback",
     "--window-title",
 )
+
+
+def _supports_required_options(help_text: str) -> bool:
+    tokens = {
+        token
+        for token in help_text.replace("=", " ").replace(",", " ").split()
+        if token.startswith("--")
+    }
+    return all(option in tokens for option in REQUIRED_OPTIONS)
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,9 +87,7 @@ def _scrcpy_executable(runtime: ScreenRuntime) -> str:
     if runtime.scrcpy_path is None:
         raise ScreenError("scrcpy_not_installed", "scrcpy executable was not found")
     help_result = runtime.runner((runtime.scrcpy_path, "--help"))
-    if not help_result.succeeded or any(
-        option not in help_result.stdout for option in REQUIRED_OPTIONS
-    ):
+    if not help_result.succeeded or not _supports_required_options(help_result.stdout):
         raise ScreenError("scrcpy_option_unsupported", "scrcpy lacks a required safe option")
     try:
         return ensure_app_executable(runtime.scrcpy_path, state_directory())
@@ -90,29 +98,58 @@ def _scrcpy_executable(runtime: ScreenRuntime) -> str:
 
 
 def doctor(runtime: ScreenRuntime) -> JsonObject:
-    """Return read-only ADB and scrcpy path availability."""
+    """Return no-launch ADB and scrcpy compatibility readiness."""
+    encoded_devices: list[JsonValue] = []
     try:
         devices = list_devices(runtime.adb)
     except AdbError as error:
         adb_result: JsonObject = {"ready": False, "error": error.code, "devices": []}
     else:
-        adb_result = {
-            "ready": True,
-            "devices": [
-                {
-                    "serial": device.serial,
-                    "state": device.state,
-                    "transport": device.transport,
-                    "model": device.model,
-                }
-                for device in devices
-            ],
-        }
+        encoded_devices = [
+            {
+                "serial": device.serial,
+                "state": device.state,
+                "transport": device.transport,
+                "model": device.model,
+            }
+            for device in devices
+        ]
+        try:
+            selected = select_enrolled_device(runtime.adb.profile, devices)
+            _ = verify_endpoint(runtime.adb, selected.serial, include_boot=True)
+        except AdbError as error:
+            adb_result = {
+                "ready": False,
+                "error": error.code,
+                "devices": encoded_devices,
+            }
+        except ScreenError as error:
+            adb_result = {
+                "ready": False,
+                "error": error.code,
+                "devices": encoded_devices,
+            }
+        else:
+            adb_result = {
+                "ready": True,
+                "selected_serial": selected.serial,
+                "devices": encoded_devices,
+            }
+    options_supported = False
+    if runtime.scrcpy_path is not None:
+        help_result = runtime.runner((runtime.scrcpy_path, "--help"))
+        options_supported = help_result.succeeded and _supports_required_options(help_result.stdout)
     scrcpy_result: JsonObject = {
         "installed": runtime.scrcpy_path is not None,
         "path": runtime.scrcpy_path,
+        "options_supported": options_supported,
     }
-    return {"adb": adb_result, "scrcpy": scrcpy_result}
+    return {
+        "preflight_ready": adb_result.get("ready") is True and options_supported,
+        "launch_verified": False,
+        "adb": adb_result,
+        "scrcpy": scrcpy_result,
+    }
 
 
 def _recording_from_state(state: ScreenState) -> RecordingPaths | None:
@@ -138,8 +175,9 @@ def start(request: ScreenRequest, runtime: ScreenRuntime) -> JsonObject:
         if identity is not None and identity_matches(existing, identity):
             raise ScreenError("scrcpy_already_running", "a managed scrcpy session is running")
         raise ScreenError("process_identity_mismatch", "stale screen state requires review")
-    executable = _scrcpy_executable(runtime)
     device = select_device(runtime.adb.profile, list_devices(runtime.adb), request.serial)
+    _ = verify_endpoint(runtime.adb, device.serial, include_boot=True)
+    executable = _scrcpy_executable(runtime)
     recording = prepare_recording(request.output)
     session_id = uuid.uuid4().hex
     stderr_path = state_directory() / f"scrcpy-{session_id}.stderr"

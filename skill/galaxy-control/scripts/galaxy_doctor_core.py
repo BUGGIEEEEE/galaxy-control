@@ -83,7 +83,11 @@ def _adb_status(runtime: DoctorRuntime) -> JsonObject:
         device
         for device in devices
         if device.state == "device"
-        and device.serial.startswith(f"{runtime.profile.tailscale_ipv4}:")
+        and (runtime.profile.steady_adb_enabled or device.serial != runtime.profile.steady_endpoint)
+        and (
+            device.serial.startswith(f"{runtime.profile.tailscale_ipv4}:")
+            or device.serial.startswith(f"adb-{runtime.profile.physical_serial}-")
+        )
         and device.model is not None
         and normalize_model(device.model) == runtime.profile.expected_model
     ]
@@ -153,14 +157,28 @@ def _bridge_available(value: JsonValue) -> bool:
     return isinstance(value, dict) and value.get("available") is True
 
 
-def _shizuku_ready(value: JsonValue) -> bool:
+def _bridge_action_data(value: JsonValue) -> JsonObject | None:
     if not isinstance(value, dict) or value.get("available") is not True:
-        return False
+        return None
     detail = value.get("result")
+    if not isinstance(detail, dict) or detail.get("ok") is not True:
+        return None
+    data = detail.get("data")
+    return cast("JsonObject", data) if isinstance(data, dict) else None
+
+
+def _accessibility_ready(value: JsonValue) -> bool:
+    data = _bridge_action_data(value)
+    return data is not None and data.get("running") is True
+
+
+def _shizuku_ready(value: JsonValue) -> bool:
+    data = _bridge_action_data(value)
     return (
-        isinstance(detail, dict)
-        and detail.get("running") is True
-        and detail.get("authorized") is True
+        data is not None
+        and data.get("state") == "READY"
+        and data.get("running") is True
+        and data.get("authorized") is True
     )
 
 
@@ -190,7 +208,7 @@ def inspect_device(
     openminis_ready = (
         check_openminis
         and _bridge_available(openminis.get("health"))
-        and _bridge_available(openminis.get("accessibility"))
+        and _accessibility_ready(openminis.get("accessibility"))
     )
     scrcpy_ready = adb_ready and scrcpy.get("installed") is True
     paths: JsonObject

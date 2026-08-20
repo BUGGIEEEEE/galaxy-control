@@ -8,7 +8,13 @@ device list, identity, Tailscale online state, foreground/UI state, and post-act
 ## L — current-request low risk
 
 Run only when the current request clearly asks for Galaxy control: one fixed OpenMinis tap/input/key
-or scroll, or one harmless requested scrcpy gesture. Observe before and verify after.
+or scroll, one harmless requested scrcpy gesture, or one
+`wireless-prepare --approved` attempt to reconnect an already-paired enrolled Galaxy after the
+first-session doctor reports ADB unavailable and the private profile records the user's separate
+`enable-auto-reconnect --approved` opt-in. The reconnect uses only one enrolled mDNS candidate,
+connects once, and verifies device identity. The stored opt-in and current-request low risk never
+authorize pairing, Wireless Debugging changes, port scans, guessed ports, or fixed TCP ADB. Observe
+before and verify after.
 
 ## A — explicit approval
 

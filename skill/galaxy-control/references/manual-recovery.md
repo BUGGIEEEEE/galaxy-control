@@ -15,11 +15,20 @@ After a Galaxy reboot, diagnose first. Do not assume every step is needed.
 ## Mac actions
 
 1. Run `galaxy_doctor.py all`.
-2. If pairing trust remains, run `wireless-connect --port CURRENT_CONNECTION_PORT`.
-3. If trust was lost, request approval and pair once using the displayed pairing port/code.
-4. Verify serial, model, and boot identity.
-5. Start scrcpy only after ADB identity succeeds.
-6. Verify OpenMinis health, Accessibility, and fresh UI state independently.
+2. If the enrolled ADB transport is absent and the private profile records the user's explicit
+   auto-reconnect opt-in, run `wireless-prepare --approved` once.
+3. If mDNS cannot identify one current port, ask for Android's displayed connection port and run
+   `wireless-connect --port CURRENT_CONNECTION_PORT`.
+4. If trust was lost, request separate approval and pair once using the displayed pairing port/code.
+5. Verify serial, model, and the canonical current boot UUID.
+6. Run `galaxy_screen.py doctor`. Treat `preflight_ready` as compatibility evidence, not a verified
+   scrcpy launch.
+7. Start scrcpy only when the requested task needs a live view, control, or recording.
+8. Verify OpenMinis health, Accessibility, and fresh UI state independently when semantic UI work is
+   needed.
+
+ADB or scrcpy recovery failure must not block a task that can still be completed and verified
+through a healthy OpenMinis path. Report the unavailable path as degraded instead.
 
 Official Wireless Debugging ports can change after Wi-Fi or reboot. Fixed TCP ADB normally closes
 on reboot and requires a newly verified, approved bootstrap. Neither behavior is an error to hide.

@@ -55,7 +55,18 @@ uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_setup.py" enroll --serial LIVE_SERIAL 
 
 The private profile is stored under the user's macOS Application Support directory with `0700`
 directory and `0600` file permissions. It contains the enrolled physical serial, model, literal
-Tailscale IPv4 address, OpenMinis port, and fixed-ADB preference. Never commit, paste, or log it.
+Tailscale IPv4 address, OpenMinis port, paired-reconnect opt-in, and fixed-ADB preference. Never
+commit, paste, or log it.
+
+Automatic restoration of an existing Wireless Debugging trust is disabled by default. Enable it
+only after the user explicitly accepts one bounded reconnect during first-session readiness:
+
+```sh
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_setup.py" enable-auto-reconnect --approved
+```
+
+This preference can be revoked with `disable-auto-reconnect --approved`. It never enables automatic
+pairing, Wireless Debugging changes, scans, guessed ports, or fixed TCP ADB.
 
 Finish with:
 

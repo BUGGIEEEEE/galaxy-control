@@ -144,3 +144,37 @@ def test_steady_adb_preference_requires_approval_and_updates_private_profile(
     assert exit_code == 0
     assert envelope["result"]["steady_adb_enabled"] is enabled
     assert load_profile().steady_adb_enabled is enabled
+
+
+@pytest.mark.parametrize(
+    ("command", "enabled"),
+    [("enable-auto-reconnect", True), ("disable-auto-reconnect", False)],
+)
+def test_auto_reconnect_preference_requires_approval_and_updates_private_profile(
+    command: str,
+    enabled: bool,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given
+    monkeypatch.setenv("GALAXY_CONTROL_HOME", str(tmp_path / "support"))
+    _ = write_profile(
+        DeviceProfile(
+            schema=1,
+            physical_serial="DEMO123456",
+            expected_model="SM_S921B",
+            tailscale_ipv4="100.64.1.20",
+            auto_reconnect_adb_enabled=not enabled,
+        )
+    )
+
+    # When
+    denied, denied_code = execute((command,), ready_runtime())
+    envelope, exit_code = execute((command, "--approved"), ready_runtime())
+
+    # Then
+    assert denied_code == 1
+    assert denied["error"]["code"] == "approval_required"
+    assert exit_code == 0
+    assert envelope["result"]["auto_reconnect_adb_enabled"] is enabled
+    assert load_profile().auto_reconnect_adb_enabled is enabled

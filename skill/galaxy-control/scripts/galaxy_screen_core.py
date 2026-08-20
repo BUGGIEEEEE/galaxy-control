@@ -91,9 +91,11 @@ def parse_request(argv: tuple[str, ...]) -> ScreenRequest:
 
 
 def _serial_matches(profile: DeviceProfile, serial: str) -> bool:
-    return serial in {profile.physical_serial, profile.steady_endpoint} or serial.startswith(
-        (f"{profile.tailscale_ipv4}:", f"adb-{profile.physical_serial}-")
-    )
+    if serial == profile.physical_serial:
+        return True
+    if serial.startswith(f"{profile.tailscale_ipv4}:"):
+        return serial != profile.steady_endpoint or profile.steady_adb_enabled
+    return serial.startswith(f"adb-{profile.physical_serial}-")
 
 
 def select_device(
@@ -127,6 +129,19 @@ def select_device(
     if normalize_model(selected.model or "") != profile.expected_model:
         _raise("device_mismatch", "selected Galaxy model does not match the profile")
     return selected
+
+
+def select_enrolled_device(
+    profile: DeviceProfile,
+    devices: tuple[AdbDevice, ...],
+) -> AdbDevice:
+    """Select exactly one enrolled transport while ignoring unrelated devices."""
+    matches = tuple(device for device in devices if _serial_matches(profile, device.serial))
+    if not matches:
+        _raise("adb_no_device", "the enrolled Galaxy is not connected")
+    if len(matches) > 1:
+        _raise("adb_multiple_devices", "multiple enrolled Galaxy transports are connected")
+    return select_device(profile, devices, next(iter(matches)).serial)
 
 
 def build_scrcpy_argv(

@@ -51,7 +51,42 @@ then use `LIFECYCLE.md` for fixed `status`, conditional `start`, and `stop` only
 
 ## Start every Galaxy task
 
-Classify the task first, then run only the matching read-only preflight:
+For the first Galaxy task in the current agent session, after reboot/network changes, or after a
+bridge/ADB error, run the read-only full doctor once:
+
+```sh
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py" all
+```
+
+If that report has no verified ADB transport and the private profile has
+`auto_reconnect_adb_enabled: true`, make one bounded attempt to reuse or restore an already-paired
+enrolled transport:
+
+```sh
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_remote_adb.py" wireless-prepare --approved
+```
+
+This fixed action first reuses an existing identity-verified transport. Otherwise it reads only
+`adb mdns services`, accepts one enrolled `_adb-tls-connect._tcp` port, connects once to the enrolled
+Tailscale host, and verifies serial, model, and current boot identity. ADB may natively auto-connect
+an already-paired mDNS service before the explicit connect; that transport is accepted only after
+the same full identity check. Fixed TCP port `5555` is never reused. The action never pairs, scans,
+guesses a port, changes Wireless Debugging, or enables fixed TCP ADB.
+`connection_port_required` means the user must read Android's currently displayed connection port.
+A failed ADB preparation must not block a healthy OpenMinis-only task.
+
+After ADB preparation, run the no-launch scrcpy compatibility preflight:
+
+```sh
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_screen.py" doctor
+```
+
+`preflight_ready: true` with `launch_verified: false` proves only the enrolled ADB target, installed
+scrcpy, and required safe options. It does not prove that a scrcpy process, video stream, window, or
+macOS Computer Use permission works.
+
+For later tasks in the same valid session, classify the task and run only the matching read-only
+preflight:
 
 ```sh
 uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py" openminis
@@ -59,10 +94,9 @@ uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py" adb
 uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py" scrcpy
 ```
 
-The scrcpy target includes its ADB dependency. Use the no-argument or `all` doctor only for a new
-control session, after reboot/network changes or connection errors, or for tasks that truly cross
-all categories. Reuse a successful result only in the current agent session and invalidate it on
-any event listed in `result.reuse.invalidate_on`; live readiness is never persisted.
+The scrcpy target includes its ADB dependency. Reuse a successful result only in the current agent
+session and invalidate it on any event listed in `result.reuse.invalidate_on`; live readiness is
+never persisted.
 
 Before semantic UI control, require fresh OpenMinis health and Accessibility evidence:
 
@@ -167,6 +201,7 @@ ADB:
 ```text
 doctor | status | connect | disconnect | recover
 wireless-doctor | wireless-status
+wireless-prepare --approved
 wireless-pair --port PAIRING_PORT --approved
 wireless-connect|wireless-disconnect|wireless-recover --port CONNECTION_PORT
 legacy-enable-from-wireless --port CONNECTION_PORT --approved
@@ -183,6 +218,9 @@ Automatic read-only work includes doctor checks, identity verification, version 
 observation needed for the request, and post-action verification.
 
 The user's current Galaxy-control request authorizes only low-risk actions needed for that request.
+One `wireless-prepare --approved` attempt is allowed only after the user separately enabled the
+private profile preference with `galaxy_setup.py enable-auto-reconnect --approved`. That persisted
+opt-in never authorizes pairing, port scanning, Wireless Debugging changes, or `adb tcpip`.
 It does not authorize sending, payment, deletion, account changes, security/permission changes,
 pairing, `adb tcpip`, network changes, reboot, app installation/update, or file modification.
 

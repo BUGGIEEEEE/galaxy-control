@@ -7,8 +7,12 @@ policy:
 runtime:
   omo:
     preflight:
+      session: ["scripts/galaxy_doctor.py", "all"]
       openminis: ["scripts/galaxy_doctor.py", "openminis"]
       adb: ["scripts/galaxy_doctor.py", "adb"]
       scrcpy: ["scripts/galaxy_doctor.py", "scrcpy"]
+    paired_adb_prepare: ["scripts/galaxy_remote_adb.py", "wireless-prepare", "--approved"]
+    paired_adb_opt_in: ["scripts/galaxy_setup.py", "enable-auto-reconnect", "--approved"]
+    scrcpy_launch_check: ["scripts/galaxy_screen.py", "doctor"]
     session_reuse: "memory_only"
     result_route_field: "result.route"

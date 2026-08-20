@@ -9,7 +9,9 @@ from galaxy_process import CommandResult
 from galaxy_profile import DeviceProfile
 from galaxy_screen import execute, route_for_action
 from galaxy_screen_core import ScreenError, build_scrcpy_argv, parse_request, select_device
-from galaxy_screen_session import ScreenRuntime
+from galaxy_screen_session import REQUIRED_OPTIONS, ScreenRuntime
+
+BOOT_ID = "11111111-2222-3333-4444-555555555555"
 
 
 def profile() -> DeviceProfile:
@@ -26,6 +28,47 @@ def profile() -> DeviceProfile:
 def device(serial: str = "DEMO123456", state: str = "device", model: str = "SM_S921B") -> AdbDevice:
     transport = "tcpip" if ":" in serial else "usb"
     return AdbDevice(serial, state, transport, model)
+
+
+def verified_identity_response(argv: tuple[str, ...]) -> CommandResult | None:
+    if argv[-2:] == ("DEMO123456", "get-state"):
+        return CommandResult(0, "device\n", "")
+    if argv[-2:] == ("getprop", "ro.serialno"):
+        return CommandResult(0, "DEMO123456\n", "")
+    if argv[-2:] == ("getprop", "ro.product.model"):
+        return CommandResult(0, "SM-S921B\n", "")
+    if argv[-2:] == ("cat", "/proc/sys/kernel/random/boot_id"):
+        return CommandResult(0, f"{BOOT_ID}\n", "")
+    return None
+
+
+VERIFIED_IDENTITY_CALLS = [
+    ("/opt/homebrew/bin/adb", "-s", "DEMO123456", "get-state"),
+    (
+        "/opt/homebrew/bin/adb",
+        "-s",
+        "DEMO123456",
+        "shell",
+        "getprop",
+        "ro.serialno",
+    ),
+    (
+        "/opt/homebrew/bin/adb",
+        "-s",
+        "DEMO123456",
+        "shell",
+        "getprop",
+        "ro.product.model",
+    ),
+    (
+        "/opt/homebrew/bin/adb",
+        "-s",
+        "DEMO123456",
+        "shell",
+        "cat",
+        "/proc/sys/kernel/random/boot_id",
+    ),
+]
 
 
 def test_view_argv_has_all_read_only_options() -> None:
@@ -127,14 +170,29 @@ def test_select_rejects_model_mismatch() -> None:
 
 def test_scrcpy_doctor_payload_identifies_adb_transport() -> None:
     # Given
+    calls: list[tuple[str, ...]] = []
+
     def runner(argv: tuple[str, ...], *, stdin: str | None = None) -> CommandResult:
         assert stdin is None
+        calls.append(argv)
         if argv[-2:] == ("devices", "-l"):
             return CommandResult(
                 0,
-                "List of devices attached\nDEMO123456 device model:SM_S921B usb:1-1\n",
+                "List of devices attached\n"
+                "UNRELATED device model:SM_OTHER usb:2-1\n"
+                "DEMO123456 device model:SM_S921B usb:1-1\n",
                 "",
             )
+        if argv == ("/opt/homebrew/bin/scrcpy", "--help"):
+            return CommandResult(
+                0,
+                "--serial --no-control --no-audio --no-clipboard-autosync "
+                "--record --no-playback --window-title",
+                "",
+            )
+        identity = verified_identity_response(argv)
+        if identity is not None:
+            return identity
         raise AssertionError(argv)
 
     adb = AdbRuntime(profile(), "/opt/homebrew/bin/adb", runner, lambda: "")
@@ -145,6 +203,16 @@ def test_scrcpy_doctor_payload_identifies_adb_transport() -> None:
 
     # Then
     assert exit_code == 0
+    assert envelope["result"]["preflight_ready"] is True
+    assert envelope["result"]["launch_verified"] is False
+    assert envelope["result"]["adb"]["ready"] is True
+    assert envelope["result"]["adb"]["selected_serial"] == "DEMO123456"
+    assert envelope["result"]["scrcpy"]["options_supported"] is True
+    assert calls == [
+        ("/opt/homebrew/bin/adb", "devices", "-l"),
+        *VERIFIED_IDENTITY_CALLS,
+        ("/opt/homebrew/bin/scrcpy", "--help"),
+    ]
     assert envelope["result"]["route"] == {
         "controller": "scrcpy",
         "transport": "adb",
@@ -152,6 +220,181 @@ def test_scrcpy_doctor_payload_identifies_adb_transport() -> None:
         "verification_required": False,
         "verify_with": [],
     }
+
+
+def test_scrcpy_doctor_rejects_unenrolled_adb_device() -> None:
+    # Given
+    def runner(argv: tuple[str, ...], *, stdin: str | None = None) -> CommandResult:
+        assert stdin is None
+        if argv[-2:] == ("devices", "-l"):
+            return CommandResult(
+                0,
+                "List of devices attached\nUNRELATED device model:SM_OTHER usb:2-1\n",
+                "",
+            )
+        if argv == ("/opt/homebrew/bin/scrcpy", "--help"):
+            return CommandResult(0, " ".join(REQUIRED_OPTIONS), "")
+        identity = verified_identity_response(argv)
+        if identity is not None:
+            return identity
+        raise AssertionError(argv)
+
+    adb = AdbRuntime(profile(), "/opt/homebrew/bin/adb", runner, lambda: "")
+
+    # When
+    envelope, exit_code = execute(
+        ("doctor",),
+        ScreenRuntime(adb, "/opt/homebrew/bin/scrcpy", runner),
+    )
+
+    # Then
+    assert exit_code == 0
+    assert envelope["result"]["preflight_ready"] is False
+    assert envelope["result"]["adb"]["ready"] is False
+    assert envelope["result"]["adb"]["error"] == "adb_no_device"
+    assert envelope["result"]["launch_verified"] is False
+
+
+def test_scrcpy_doctor_rejects_disabled_fixed_tcp_transport() -> None:
+    # Given
+    def runner(argv: tuple[str, ...], *, stdin: str | None = None) -> CommandResult:
+        assert stdin is None
+        if argv[-2:] == ("devices", "-l"):
+            return CommandResult(
+                0,
+                "List of devices attached\n100.64.1.20:5555 device model:SM_S921B\n",
+                "",
+            )
+        if argv == ("/opt/homebrew/bin/scrcpy", "--help"):
+            return CommandResult(0, " ".join(REQUIRED_OPTIONS), "")
+        raise AssertionError(argv)
+
+    disabled_profile = profile().model_copy(update={"steady_adb_enabled": False})
+    adb = AdbRuntime(disabled_profile, "/opt/homebrew/bin/adb", runner, lambda: "")
+
+    # When
+    envelope, exit_code = execute(
+        ("doctor",),
+        ScreenRuntime(adb, "/opt/homebrew/bin/scrcpy", runner),
+    )
+
+    # Then
+    assert exit_code == 0
+    assert envelope["result"]["preflight_ready"] is False
+    assert envelope["result"]["adb"]["ready"] is False
+    assert envelope["result"]["adb"]["error"] == "adb_no_device"
+
+
+def test_scrcpy_doctor_reports_missing_safe_option_without_launching() -> None:
+    # Given
+    calls: list[tuple[str, ...]] = []
+
+    def runner(argv: tuple[str, ...], *, stdin: str | None = None) -> CommandResult:
+        assert stdin is None
+        calls.append(argv)
+        if argv[-2:] == ("devices", "-l"):
+            return CommandResult(
+                0,
+                "List of devices attached\nDEMO123456 device model:SM_S921B usb:1-1\n",
+                "",
+            )
+        if argv == ("/opt/homebrew/bin/scrcpy", "--help"):
+            return CommandResult(0, "--serial --no-control", "")
+        identity = verified_identity_response(argv)
+        if identity is not None:
+            return identity
+        raise AssertionError(argv)
+
+    adb = AdbRuntime(profile(), "/opt/homebrew/bin/adb", runner, lambda: "")
+
+    # When
+    envelope, exit_code = execute(
+        ("doctor",),
+        ScreenRuntime(adb, "/opt/homebrew/bin/scrcpy", runner),
+    )
+
+    # Then
+    assert exit_code == 0
+    assert envelope["result"]["preflight_ready"] is False
+    assert envelope["result"]["scrcpy"]["options_supported"] is False
+    assert envelope["result"]["launch_verified"] is False
+    assert calls == [
+        ("/opt/homebrew/bin/adb", "devices", "-l"),
+        *VERIFIED_IDENTITY_CALLS,
+        ("/opt/homebrew/bin/scrcpy", "--help"),
+    ]
+
+
+def test_scrcpy_doctor_does_not_accept_prefixed_option_name() -> None:
+    # Given
+    def runner(argv: tuple[str, ...], *, stdin: str | None = None) -> CommandResult:
+        assert stdin is None
+        if argv[-2:] == ("devices", "-l"):
+            return CommandResult(
+                0,
+                "List of devices attached\nDEMO123456 device model:SM_S921B usb:1-1\n",
+                "",
+            )
+        if argv == ("/opt/homebrew/bin/scrcpy", "--help"):
+            return CommandResult(
+                0,
+                "--serial --no-control --no-audio --no-clipboard-autosync "
+                "--record-format --no-playback --window-title",
+                "",
+            )
+        identity = verified_identity_response(argv)
+        if identity is not None:
+            return identity
+        raise AssertionError(argv)
+
+    adb = AdbRuntime(profile(), "/opt/homebrew/bin/adb", runner, lambda: "")
+
+    # When
+    envelope, exit_code = execute(
+        ("doctor",),
+        ScreenRuntime(adb, "/opt/homebrew/bin/scrcpy", runner),
+    )
+
+    # Then
+    assert exit_code == 0
+    assert envelope["result"]["preflight_ready"] is False
+    assert envelope["result"]["scrcpy"]["options_supported"] is False
+
+
+def test_scrcpy_doctor_rereads_physical_identity_before_ready() -> None:
+    # Given
+    def runner(argv: tuple[str, ...], *, stdin: str | None = None) -> CommandResult:
+        assert stdin is None
+        if argv[-2:] == ("devices", "-l"):
+            return CommandResult(
+                0,
+                "List of devices attached\nDEMO123456 device model:SM_S921B usb:1-1\n",
+                "",
+            )
+        if argv[-2:] == ("DEMO123456", "get-state"):
+            return CommandResult(0, "device\n", "")
+        if argv[-2:] == ("getprop", "ro.serialno"):
+            return CommandResult(0, "OTHER123456\n", "")
+        if argv == ("/opt/homebrew/bin/scrcpy", "--help"):
+            return CommandResult(0, " ".join(REQUIRED_OPTIONS), "")
+        identity = verified_identity_response(argv)
+        if identity is not None:
+            return identity
+        raise AssertionError(argv)
+
+    adb = AdbRuntime(profile(), "/opt/homebrew/bin/adb", runner, lambda: "")
+
+    # When
+    envelope, exit_code = execute(
+        ("doctor",),
+        ScreenRuntime(adb, "/opt/homebrew/bin/scrcpy", runner),
+    )
+
+    # Then
+    assert exit_code == 0
+    assert envelope["result"]["preflight_ready"] is False
+    assert envelope["result"]["adb"]["ready"] is False
+    assert envelope["result"]["adb"]["error"] == "device_mismatch"
 
 
 def test_scrcpy_record_route_reports_recording_role() -> None:

@@ -32,6 +32,7 @@ def test_profile_round_trip_when_private_directory_is_new(
     # Then
     assert written == profile_path()
     assert loaded == example_profile()
+    assert loaded.auto_reconnect_adb_enabled is False
     assert written.stat().st_mode & 0o777 == 0o600
     assert written.parent.stat().st_mode & 0o777 == 0o700
 
@@ -92,5 +93,6 @@ def test_profile_requires_exact_schema() -> None:
                 "tailscale_ipv4": "100.64.1.20",
                 "openminis_port": 43129,
                 "steady_adb_enabled": False,
+                "auto_reconnect_adb_enabled": False,
             }
         )

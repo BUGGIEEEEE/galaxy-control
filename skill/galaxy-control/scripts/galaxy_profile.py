@@ -43,6 +43,7 @@ class DeviceProfile(BaseModel):
     tailscale_ipv4: str
     openminis_port: Annotated[int, Field(ge=1, le=65535)] = 43129
     steady_adb_enabled: bool = False
+    auto_reconnect_adb_enabled: bool = False
     steady_adb_port: Literal[5555] = 5555
 
     @field_validator("tailscale_ipv4")
@@ -145,5 +146,12 @@ def load_profile() -> DeviceProfile:
 def set_steady_adb(enabled: bool) -> DeviceProfile:
     """Persist the user's explicit fixed TCP ADB preference."""
     updated = load_profile().model_copy(update={"steady_adb_enabled": enabled})
+    _ = write_profile(updated)
+    return updated
+
+
+def set_auto_reconnect_adb(enabled: bool) -> DeviceProfile:
+    """Persist the user's explicit paired ADB reconnect preference."""
+    updated = load_profile().model_copy(update={"auto_reconnect_adb_enabled": enabled})
     _ = write_profile(updated)
     return updated
