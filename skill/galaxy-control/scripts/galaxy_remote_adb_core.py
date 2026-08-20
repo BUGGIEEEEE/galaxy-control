@@ -99,12 +99,13 @@ def _connect(runtime: AdbRuntime) -> JsonObject:
     response = run_adb(runtime, (adb_path(runtime), "connect", runtime.profile.steady_endpoint))
     if not response.succeeded:
         raise AdbError("adb_connect_failed", "fixed endpoint connection failed")
-    verified = verify_endpoint(runtime, runtime.profile.steady_endpoint, include_boot=False)
+    verified = verify_endpoint(runtime, runtime.profile.steady_endpoint, include_boot=True)
     return {
         "connected": True,
         "endpoint": verified.endpoint,
         "device_serial": verified.physical_serial,
         "model": verified.model,
+        "boot_session_hash": verified.boot_session_hash,
     }
 
 

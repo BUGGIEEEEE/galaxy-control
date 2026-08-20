@@ -356,6 +356,72 @@ def test_adb_preflight_accepts_verified_native_mdns_alias() -> None:
     assert report["adb"]["devices"][0]["transport"] == "tcpip"
 
 
+def test_adb_preflight_rejects_dynamic_transport_for_steady_profile() -> None:
+    # Given
+    runner = FakeRunner(
+        [
+            result("Android Debug Bridge version 1.0.41\n"),
+            result("List of devices attached\n100.64.1.20:32002 device model:SM_S921B\n"),
+        ]
+    )
+    steady_profile = profile().model_copy(update={"steady_adb_enabled": True})
+
+    # When
+    report = inspect_device(
+        DoctorRuntime(steady_profile, runner, paths, bridge),
+        target=PreflightTarget.ADB,
+    )
+
+    # Then
+    assert report["status"] == "BLOCKED"
+    assert report["control_paths"] == {"adb": False}
+    assert report["adb"]["error"] == "device_mismatch"
+
+
+def test_adb_preflight_rejects_usb_transport_for_steady_profile() -> None:
+    # Given
+    runner = FakeRunner(
+        [
+            result("Android Debug Bridge version 1.0.41\n"),
+            result("List of devices attached\nDEMO123456 device model:SM_S921B usb:1-1\n"),
+        ]
+    )
+    steady_profile = profile().model_copy(update={"steady_adb_enabled": True})
+
+    # When
+    report = inspect_device(
+        DoctorRuntime(steady_profile, runner, paths, bridge),
+        target=PreflightTarget.ADB,
+    )
+
+    # Then
+    assert report["status"] == "BLOCKED"
+    assert report["control_paths"] == {"adb": False}
+    assert report["adb"]["error"] == "device_mismatch"
+
+
+def test_adb_preflight_accepts_fixed_transport_for_steady_profile() -> None:
+    # Given
+    runner = FakeRunner(
+        [
+            result("Android Debug Bridge version 1.0.41\n"),
+            result("List of devices attached\n100.64.1.20:5555 device model:SM_S921B\n"),
+            result("DEMO123456\n"),
+        ]
+    )
+    steady_profile = profile().model_copy(update={"steady_adb_enabled": True})
+
+    # When
+    report = inspect_device(
+        DoctorRuntime(steady_profile, runner, paths, bridge),
+        target=PreflightTarget.ADB,
+    )
+
+    # Then
+    assert report["status"] == "READY"
+    assert report["control_paths"] == {"adb": True}
+
+
 def test_doctor_cli_accepts_only_fixed_preflight_targets() -> None:
     # Given
     runtime = DoctorRuntime(

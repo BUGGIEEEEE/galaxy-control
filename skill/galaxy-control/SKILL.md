@@ -58,9 +58,16 @@ bridge/ADB error, run the read-only full doctor once:
 uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py" all
 ```
 
-If that report has no verified ADB transport and the private profile has
-`auto_reconnect_adb_enabled: true`, make one bounded attempt to reuse or restore an already-paired
-enrolled transport:
+If that report has no verified ADB transport, read the private profile. When
+`steady_adb_enabled: true`, first make one fixed-profile `connect` attempt. A successful fixed
+connection must verify serial, model, and current boot identity and is the final ADB state.
+
+```sh
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_remote_adb.py" connect
+```
+
+If the fixed endpoint is unavailable and the profile has `auto_reconnect_adb_enabled: true`, make
+one bounded attempt to reuse or restore an already-paired official Wireless Debugging transport:
 
 ```sh
 uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_remote_adb.py" wireless-prepare --approved
@@ -70,10 +77,28 @@ This fixed action first reuses an existing identity-verified transport. Otherwis
 `adb mdns services`, accepts one enrolled `_adb-tls-connect._tcp` port, connects once to the enrolled
 Tailscale host, and verifies serial, model, and current boot identity. ADB may natively auto-connect
 an already-paired mDNS service before the explicit connect; that transport is accepted only after
-the same full identity check. Fixed TCP port `5555` is never reused. The action never pairs, scans,
-guesses a port, changes Wireless Debugging, or enables fixed TCP ADB.
-`connection_port_required` means the user must read Android's currently displayed connection port.
-A failed ADB preparation must not block a healthy OpenMinis-only task.
+the same full identity check. The action never pairs, scans, guesses a port, changes Wireless
+Debugging, or enables fixed TCP ADB.
+
+If it returns `connection_port_required` and OpenMinis health plus Accessibility are available,
+inspect Wi-Fi status and open Android's Wireless Debugging settings read-only. Read only the current
+`IP address & port` value and run `wireless-connect --port CURRENT_CONNECTION_PORT`. Never toggle
+Wireless Debugging or tap a pairing control. Ask the user to read the port only when no healthy
+read-only path can inspect it.
+
+For a profile with `steady_adb_enabled: true`, the verified dynamic endpoint is bootstrap-only.
+Apply the already-approved steady preference, reconnect the enrolled fixed endpoint, and verify it:
+
+```sh
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_remote_adb.py" \
+  legacy-enable-from-wireless --port CURRENT_CONNECTION_PORT --approved
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_remote_adb.py" connect
+uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py" adb
+```
+
+Do not report ADB readiness for that profile until the selected endpoint is the profile's fixed
+`:5555` endpoint with matching serial, model, and a current boot-session hash. A failed ADB
+preparation must not block a healthy OpenMinis-only task.
 
 After ADB preparation, run the no-launch scrcpy compatibility preflight:
 
@@ -219,10 +244,15 @@ observation needed for the request, and post-action verification.
 
 The user's current Galaxy-control request authorizes only low-risk actions needed for that request.
 One `wireless-prepare --approved` attempt is allowed only after the user separately enabled the
-private profile preference with `galaxy_setup.py enable-auto-reconnect --approved`. That persisted
-opt-in never authorizes pairing, port scanning, Wireless Debugging changes, or `adb tcpip`.
-It does not authorize sending, payment, deletion, account changes, security/permission changes,
-pairing, `adb tcpip`, network changes, reboot, app installation/update, or file modification.
+private profile preference with `galaxy_setup.py enable-auto-reconnect --approved`. When the same
+profile also has the separately approved `steady_adb_enabled: true`, a current Galaxy-control
+request authorizes one exact, boot-verified promotion through
+`legacy-enable-from-wireless --port CURRENT_CONNECTION_PORT --approved` and one fixed `connect`.
+These persisted opt-ins never authorize pairing, port scanning, Wireless Debugging changes, or
+arbitrary `adb tcpip`.
+It does not authorize sending, payment, deletion, account changes, other security/permission
+changes, pairing, a fixed-ADB preference change, network changes, reboot, app installation/update,
+or file modification.
 
 Read [autonomy-policy.md](references/autonomy-policy.md) when approval is uncertain. Never install,
 update, activate, repair, or reconcile the OpenMinis app, and never delete its app data. The reviewed

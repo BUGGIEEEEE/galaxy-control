@@ -12,6 +12,7 @@ import errno
 import json
 import os
 import shutil
+import stat
 import sys
 import tempfile
 from dataclasses import dataclass
@@ -94,6 +95,76 @@ def _new_backup_path(parent: Path) -> Path:
     return backup
 
 
+def _secure_legacy_cache_root(directory: Path) -> None:
+    """Migrate the user-owned v0.4 cache parent to the v0.5 privacy contract."""
+    try:
+        initial = directory.lstat()
+    except FileNotFoundError:
+        return
+    except OSError as error:
+        raise InstallError(
+            "cache_migration_failed",
+            "legacy Galaxy Control cache could not be inspected",
+        ) from error
+    if not stat.S_ISDIR(initial.st_mode) or initial.st_uid != os.getuid():
+        raise InstallError(
+            "cache_migration_unsafe",
+            "legacy Galaxy Control cache is not a user-owned real directory",
+        )
+    try:
+        descriptor = os.open(
+            directory,
+            os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+        )
+    except OSError as error:
+        raise InstallError(
+            "cache_migration_failed",
+            "legacy Galaxy Control cache could not be opened safely",
+        ) from error
+    try:
+        metadata = os.fstat(descriptor)
+        if (
+            not stat.S_ISDIR(metadata.st_mode)
+            or metadata.st_uid != os.getuid()
+            or metadata.st_dev != initial.st_dev
+            or metadata.st_ino != initial.st_ino
+        ):
+            raise InstallError(
+                "cache_migration_unsafe",
+                "legacy Galaxy Control cache changed before migration",
+            )
+        try:
+            os.fchmod(descriptor, 0o700)
+            migrated = os.fstat(descriptor)
+            path_metadata = directory.lstat()
+        except OSError as error:
+            raise InstallError(
+                "cache_migration_failed",
+                "legacy Galaxy Control cache could not be secured",
+            ) from error
+        if (
+            not stat.S_ISDIR(migrated.st_mode)
+            or migrated.st_uid != os.getuid()
+            or stat.S_IMODE(migrated.st_mode) != 0o700
+        ):
+            raise InstallError(
+                "cache_migration_failed",
+                "legacy Galaxy Control cache did not become private",
+            )
+        if (
+            not stat.S_ISDIR(path_metadata.st_mode)
+            or path_metadata.st_uid != os.getuid()
+            or path_metadata.st_dev != migrated.st_dev
+            or path_metadata.st_ino != migrated.st_ino
+        ):
+            raise InstallError(
+                "cache_migration_unsafe",
+                "legacy Galaxy Control cache path changed during migration",
+            )
+    finally:
+        os.close(descriptor)
+
+
 def upgrade(source: Path, destination: Path) -> UpgradeResult:
     """Replace one real installed skill while retaining an exact rollback copy."""
     _validate_source(source)
@@ -136,6 +207,7 @@ def main(argv: tuple[str, ...] | None = None) -> int:
         destination = Path.home() / ".codex" / "skills" / "galaxy-control"
         try:
             if action == "upgrade":
+                _secure_legacy_cache_root(Path.home() / "Library" / "Caches" / "galaxy-control")
                 upgraded = upgrade(source, destination)
                 installed = upgraded.installed
                 backup: str | None = str(upgraded.backup)

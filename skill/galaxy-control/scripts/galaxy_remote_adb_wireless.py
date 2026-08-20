@@ -192,7 +192,64 @@ def _prepare(request: WirelessRequest, runtime: AdbRuntime) -> JsonObject:
     if expected:
         selected = next(iter(expected))
         verified = verify_endpoint(runtime, selected.serial, include_boot=True)
-        return {
+        if (
+            runtime.profile.steady_adb_enabled
+            and selected.transport == "tcpip"
+            and not selected.serial.startswith(f"{runtime.profile.tailscale_ipv4}:")
+        ):
+            discovery = run_adb(runtime, (adb_path(runtime), "mdns", "services"))
+            if not discovery.succeeded:
+                raise AdbError(
+                    "connection_port_required",
+                    "current Wireless Debugging connection port is required",
+                )
+            ports = parse_mdns_connection_ports(
+                discovery.stdout,
+                runtime.profile.physical_serial,
+            )
+            if not ports:
+                raise AdbError(
+                    "connection_port_required",
+                    "current Wireless Debugging connection port is required",
+                )
+            if len(ports) > 1:
+                raise AdbError(
+                    "mdns_ambiguous",
+                    "multiple enrolled Wireless Debugging ports require review",
+                )
+            selected_port = next(iter(ports))
+            connected = _connect(
+                WirelessRequest(WirelessAction.CONNECT, selected_port, approved=True),
+                runtime,
+            )
+            return {
+                **connected,
+                "ready": True,
+                "reused": True,
+                "source_endpoint": verified.endpoint,
+                "discovery": "adb_mdns",
+                "transport": "adb_tcpip",
+            }
+        connection_port: ConnectionPort | None = None
+        if selected.serial.startswith(f"{runtime.profile.tailscale_ipv4}:"):
+            connection_port = _port(
+                selected.serial.rsplit(":", 1)[1],
+                "connection_port_invalid",
+            )
+            if verified.boot_session_hash is None:
+                raise AdbError(
+                    "boot_session_unavailable",
+                    "boot session could not be verified",
+                )
+            write_state(
+                WirelessState(
+                    endpoint=selected.serial,
+                    port=int(connection_port),
+                    boot_session_hash=verified.boot_session_hash,
+                    profile_hash=profile_hash(runtime.profile),
+                )
+            )
+        result: JsonObject = {
             "ready": True,
             "reused": True,
             "endpoint": verified.endpoint,
@@ -201,6 +258,9 @@ def _prepare(request: WirelessRequest, runtime: AdbRuntime) -> JsonObject:
             "boot_session_hash": verified.boot_session_hash,
             "transport": "adb_usb" if selected.transport == "usb" else "adb_tcpip",
         }
+        if connection_port is not None:
+            result["connection_port"] = int(connection_port)
+        return result
     discovery = run_adb(runtime, (adb_path(runtime), "mdns", "services"))
     if not discovery.succeeded:
         raise AdbError(

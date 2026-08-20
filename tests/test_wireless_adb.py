@@ -210,14 +210,46 @@ def test_wireless_prepare_labels_native_mdns_transport_as_tcpip(
             *identity_results(),
         ]
     )
+    dynamic_profile = profile().model_copy(update={"steady_adb_enabled": False})
+    dynamic_runtime = AdbRuntime(
+        dynamic_profile,
+        "/opt/homebrew/bin/adb",
+        runner,
+        lambda: "123456",
+    )
 
     # When
-    envelope, exit_code = execute(("wireless-prepare", "--approved"), runtime(runner))
+    envelope, exit_code = execute(("wireless-prepare", "--approved"), dynamic_runtime)
 
     # Then
     assert exit_code == 0
     assert envelope["result"]["endpoint"] == native_serial
     assert envelope["result"]["route"]["transport"] == "adb_tcpip"
+
+
+def test_wireless_prepare_requires_port_for_native_alias_on_steady_profile(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given
+    monkeypatch.setenv("GALAXY_WIRELESS_STATE_DIR", str(tmp_path / "state"))
+    native_serial = "adb-DEMO123456-live._adb-tls-connect._tcp"
+    runner = FakeRunner(
+        [
+            result(
+                f"List of devices attached\n{native_serial} device model:SM_S921B transport_id:1\n"
+            ),
+            *identity_results(),
+            result(stderr="mDNS unavailable", returncode=1),
+        ]
+    )
+
+    # When
+    envelope, exit_code = execute(("wireless-prepare", "--approved"), runtime(runner))
+
+    # Then
+    assert exit_code == 1
+    assert envelope["error"]["code"] == "connection_port_required"
 
 
 def test_wireless_prepare_discovers_connects_and_verifies_once(
@@ -532,6 +564,39 @@ def test_legacy_enable_requires_same_cached_endpoint_and_boot(
         "5555",
     )
     assert envelope["result"]["verification_required"] is True
+
+
+def test_reused_dynamic_transport_persists_state_for_steady_promotion(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given
+    monkeypatch.setenv("GALAXY_WIRELESS_STATE_DIR", str(tmp_path / "state"))
+    prepare_runner = FakeRunner(
+        [
+            result(
+                "List of devices attached\n100.64.1.20:32002 device model:SM_S921B transport_id:1\n"
+            ),
+            *identity_results(),
+        ]
+    )
+
+    # When
+    prepared, prepare_code = execute(
+        ("wireless-prepare", "--approved"),
+        runtime(prepare_runner),
+    )
+    enable_runner = FakeRunner([*identity_results(), result("restarting in TCP mode port: 5555\n")])
+    enabled, enable_code = execute(
+        ("legacy-enable-from-wireless", "--port", "32002", "--approved"),
+        runtime(enable_runner),
+    )
+
+    # Then
+    assert prepare_code == 0
+    assert prepared["result"]["connection_port"] == 32002
+    assert enable_code == 0
+    assert enabled["result"]["enabled"] is True
 
 
 def test_wireless_recover_refuses_previous_boot(

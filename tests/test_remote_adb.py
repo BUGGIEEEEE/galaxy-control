@@ -46,7 +46,13 @@ def runtime(
 def test_legacy_connect_uses_profile_endpoint_and_verifies_identity() -> None:
     # Given
     runner = FakeRunner(
-        [result("connected\n"), result("device\n"), result("DEMO123456\n"), result("SM-S921B\n")]
+        [
+            result("connected\n"),
+            result("device\n"),
+            result("DEMO123456\n"),
+            result("SM-S921B\n"),
+            result("11111111-2222-3333-4444-555555555555\n"),
+        ]
     )
 
     # When
@@ -55,6 +61,7 @@ def test_legacy_connect_uses_profile_endpoint_and_verifies_identity() -> None:
     # Then
     assert exit_code == 0
     assert envelope["result"]["endpoint"] == "100.64.1.20:5555"
+    assert envelope["result"]["boot_session_hash"]
     assert runner.calls[0][0] == ("/opt/homebrew/bin/adb", "connect", "100.64.1.20:5555")
     assert envelope["result"]["route"] == {
         "controller": "adb",

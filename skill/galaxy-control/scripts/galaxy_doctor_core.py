@@ -79,14 +79,21 @@ def _adb_status(runtime: DoctorRuntime) -> JsonObject:
     if not listing.succeeded:
         return {"installed": True, "devices": [], "error": "adb_devices_failed"}
     devices = parse_devices(listing.stdout)
+    dynamic_prefixes = (
+        f"{runtime.profile.tailscale_ipv4}:",
+        f"adb-{runtime.profile.physical_serial}-",
+    )
     remote_candidates = [
         device
         for device in devices
         if device.state == "device"
-        and (runtime.profile.steady_adb_enabled or device.serial != runtime.profile.steady_endpoint)
         and (
-            device.serial.startswith(f"{runtime.profile.tailscale_ipv4}:")
-            or device.serial.startswith(f"adb-{runtime.profile.physical_serial}-")
+            device.serial == runtime.profile.steady_endpoint
+            if runtime.profile.steady_adb_enabled
+            else (
+                device.serial != runtime.profile.steady_endpoint
+                and device.serial.startswith(dynamic_prefixes)
+            )
         )
         and device.model is not None
         and normalize_model(device.model) == runtime.profile.expected_model
@@ -118,7 +125,13 @@ def _adb_status(runtime: DoctorRuntime) -> JsonObject:
         device
         for device in devices
         if device.state == "device"
-        and (device.serial == runtime.profile.physical_serial or device.serial in remote_serials)
+        and (
+            device.serial in remote_serials
+            or (
+                not runtime.profile.steady_adb_enabled
+                and device.serial == runtime.profile.physical_serial
+            )
+        )
         and device.model is not None
         and normalize_model(device.model) == runtime.profile.expected_model
     ]

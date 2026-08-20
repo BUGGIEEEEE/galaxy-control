@@ -21,7 +21,7 @@ def profile() -> DeviceProfile:
         expected_model="SM_S921B",
         tailscale_ipv4="100.64.1.20",
         openminis_port=43129,
-        steady_adb_enabled=True,
+        steady_adb_enabled=False,
     )
 
 
@@ -31,7 +31,7 @@ def device(serial: str = "DEMO123456", state: str = "device", model: str = "SM_S
 
 
 def verified_identity_response(argv: tuple[str, ...]) -> CommandResult | None:
-    if argv[-2:] == ("DEMO123456", "get-state"):
+    if argv[-1:] == ("get-state",):
         return CommandResult(0, "device\n", "")
     if argv[-2:] == ("getprop", "ro.serialno"):
         return CommandResult(0, "DEMO123456\n", "")
@@ -283,6 +283,98 @@ def test_scrcpy_doctor_rejects_disabled_fixed_tcp_transport() -> None:
     assert envelope["result"]["preflight_ready"] is False
     assert envelope["result"]["adb"]["ready"] is False
     assert envelope["result"]["adb"]["error"] == "adb_no_device"
+
+
+def test_scrcpy_doctor_rejects_dynamic_transport_for_steady_profile() -> None:
+    # Given
+    def runner(argv: tuple[str, ...], *, stdin: str | None = None) -> CommandResult:
+        assert stdin is None
+        if argv[-2:] == ("devices", "-l"):
+            return CommandResult(
+                0,
+                "List of devices attached\n100.64.1.20:32002 device model:SM_S921B\n",
+                "",
+            )
+        if argv == ("/opt/homebrew/bin/scrcpy", "--help"):
+            return CommandResult(0, " ".join(REQUIRED_OPTIONS), "")
+        raise AssertionError(argv)
+
+    steady_profile = profile().model_copy(update={"steady_adb_enabled": True})
+    adb = AdbRuntime(steady_profile, "/opt/homebrew/bin/adb", runner, lambda: "")
+
+    # When
+    envelope, exit_code = execute(
+        ("doctor",),
+        ScreenRuntime(adb, "/opt/homebrew/bin/scrcpy", runner),
+    )
+
+    # Then
+    assert exit_code == 0
+    assert envelope["result"]["preflight_ready"] is False
+    assert envelope["result"]["adb"]["ready"] is False
+    assert envelope["result"]["adb"]["error"] == "adb_no_device"
+
+
+def test_scrcpy_doctor_rejects_usb_transport_for_steady_profile() -> None:
+    # Given
+    def runner(argv: tuple[str, ...], *, stdin: str | None = None) -> CommandResult:
+        assert stdin is None
+        if argv[-2:] == ("devices", "-l"):
+            return CommandResult(
+                0,
+                "List of devices attached\nDEMO123456 device model:SM_S921B usb:1-1\n",
+                "",
+            )
+        if argv == ("/opt/homebrew/bin/scrcpy", "--help"):
+            return CommandResult(0, " ".join(REQUIRED_OPTIONS), "")
+        raise AssertionError(argv)
+
+    steady_profile = profile().model_copy(update={"steady_adb_enabled": True})
+    adb = AdbRuntime(steady_profile, "/opt/homebrew/bin/adb", runner, lambda: "")
+
+    # When
+    envelope, exit_code = execute(
+        ("doctor",),
+        ScreenRuntime(adb, "/opt/homebrew/bin/scrcpy", runner),
+    )
+
+    # Then
+    assert exit_code == 0
+    assert envelope["result"]["preflight_ready"] is False
+    assert envelope["result"]["adb"]["ready"] is False
+    assert envelope["result"]["adb"]["error"] == "adb_no_device"
+
+
+def test_scrcpy_doctor_accepts_fixed_transport_for_steady_profile() -> None:
+    # Given
+    def runner(argv: tuple[str, ...], *, stdin: str | None = None) -> CommandResult:
+        assert stdin is None
+        if argv[-2:] == ("devices", "-l"):
+            return CommandResult(
+                0,
+                "List of devices attached\n100.64.1.20:5555 device model:SM_S921B\n",
+                "",
+            )
+        if argv == ("/opt/homebrew/bin/scrcpy", "--help"):
+            return CommandResult(0, " ".join(REQUIRED_OPTIONS), "")
+        identity = verified_identity_response(argv)
+        if identity is not None:
+            return identity
+        raise AssertionError(argv)
+
+    steady_profile = profile().model_copy(update={"steady_adb_enabled": True})
+    adb = AdbRuntime(steady_profile, "/opt/homebrew/bin/adb", runner, lambda: "")
+
+    # When
+    envelope, exit_code = execute(
+        ("doctor",),
+        ScreenRuntime(adb, "/opt/homebrew/bin/scrcpy", runner),
+    )
+
+    # Then
+    assert exit_code == 0
+    assert envelope["result"]["preflight_ready"] is True
+    assert envelope["result"]["adb"]["ready"] is True
 
 
 def test_scrcpy_doctor_reports_missing_safe_option_without_launching() -> None:
