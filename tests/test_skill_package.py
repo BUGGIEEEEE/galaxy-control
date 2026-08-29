@@ -61,7 +61,10 @@ def test_agent_metadata_mentions_explicit_skill_prompt() -> None:
     assert (
         'paired_adb_opt_in: ["scripts/galaxy_setup.py", "enable-auto-reconnect", "--approved"]'
     ) in content
-    assert 'connection_port_fallback: "openminis_wireless_debugging_read_only"' in content
+    assert (
+        'connection_port_sources: ["current_shizuku_launcher_output", '
+        '"openminis_wireless_debugging_read_only"]'
+    ) in content
     assert 'steady_adb_probe: ["scripts/galaxy_remote_adb.py", "connect"]' in content
     assert (
         'steady_adb_promote: ["scripts/galaxy_remote_adb.py", '

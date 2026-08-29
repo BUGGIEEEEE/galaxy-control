@@ -159,7 +159,7 @@ def test_upgrade_cli_activates_bundled_version(
     # Then
     assert exit_code == 0
     assert '"action":"upgrade"' in capsys.readouterr().out
-    assert (destination / "VERSION").read_text().strip() == "0.5.1"
+    assert (destination / "VERSION").read_text().strip() == "0.5.2"
 
 
 def test_upgrade_cli_secures_legacy_cache_parent(

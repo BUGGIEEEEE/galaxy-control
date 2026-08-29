@@ -47,7 +47,8 @@ def _status(runtime: AdbRuntime) -> JsonObject:
             device.serial == runtime.profile.physical_serial for device in targets
         ),
         "remote_connected": any(
-            device.serial == runtime.profile.steady_endpoint for device in targets
+            device.serial == runtime.profile.steady_endpoint and device.state == "device"
+            for device in targets
         ),
         "duplicate_transports": len(targets) > 1,
         "devices": [

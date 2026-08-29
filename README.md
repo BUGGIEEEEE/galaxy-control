@@ -59,7 +59,7 @@ Galaxy 재부팅 후 완전
 공개 릴리스 태그를 고정해 내려받습니다.
 
 ```sh
-git clone --depth 1 --branch v0.5.1 https://github.com/BUGGIEEEEE/galaxy-control.git
+git clone --depth 1 --branch v0.5.2 https://github.com/BUGGIEEEEE/galaxy-control.git
 cd galaxy-control
 python3 scripts/install_skill.py --approved
 ```
@@ -72,7 +72,7 @@ python3 scripts/install_skill.py --upgrade --approved
 ```
 
 업그레이드는 새 스킬을 먼저 별도 경로에 복사한 뒤 기존 설치를 비공개
-`.galaxy-control-backups` 디렉터리로 이동하고 새 버전을 활성화합니다. v0.5.1 업그레이드는
+`.galaxy-control-backups` 디렉터리로 이동하고 새 버전을 활성화합니다. v0.5.2 업그레이드는
 사용자 소유의 기존 `~/Library/Caches/galaxy-control`이 있으면 심볼릭 링크가 아님을 확인한
 뒤 권한을 `0700`으로 강화합니다. 활성화에 실패하면
 기존 설치를 즉시 복구하며, 성공한 경우 출력된 백업 경로를 수동 롤백용으로 유지합니다.
@@ -81,12 +81,12 @@ Application Support의 기기 프로필과 ADB 키는 스킬 디렉터리 밖에
 
 ### 기존 스킬이 설치된 사용자
 
-기존 스킬을 삭제·이동·덮어쓰지 않아도 브리지 준비를 먼저 진행할 수 있습니다. `v0.5.1`
+기존 스킬을 삭제·이동·덮어쓰지 않아도 브리지 준비를 먼저 진행할 수 있습니다. `v0.5.2`
 저장소를 별도 폴더에 내려받고, 아래처럼 **체크아웃 안의 배포용 스킬 경로**를 사용합니다.
 
 ```sh
-git clone --depth 1 --branch v0.5.1 https://github.com/BUGGIEEEEE/galaxy-control.git galaxy-control-v0.5.1
-cd galaxy-control-v0.5.1
+git clone --depth 1 --branch v0.5.2 https://github.com/BUGGIEEEEE/galaxy-control.git galaxy-control-v0.5.2
+cd galaxy-control-v0.5.2
 BRIDGE_RELEASE_ROOT="$PWD/skill/galaxy-control"
 
 uv run "$BRIDGE_RELEASE_ROOT/scripts/galaxy_bridge_package.py" doctor
@@ -96,7 +96,7 @@ uv run "$BRIDGE_RELEASE_ROOT/scripts/galaxy_bridge_package.py" \
 
 이 명령은 기존에 설치된 `~/.codex/skills/galaxy-control`을 수정하지 않습니다. 등록 프로필은
 기존 Application Support 위치에서 읽고, 새 개인화 인계 폴더만 만듭니다. 브리지 E2E 확인 후
-스킬 자체를 `v0.5.1`로 교체할지는 별도 작업으로 결정하세요. 설치기는 의도적으로 자동
+스킬 자체를 `v0.5.2`로 교체할지는 별도 작업으로 결정하세요. 설치기는 의도적으로 자동
 업그레이드하지 않습니다.
 
 `uv`가 없는 새 Mac은 저장소 안의 표준 Python 부트스트랩으로 먼저 확인합니다.
@@ -224,13 +224,22 @@ uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_screen.py" doctor
 `adb mdns services`에서
 등록 시리얼의 `_adb-tls-connect._tcp` 포트 하나만 받아 등록된 Galaxy Tailscale 주소로
 연결하고 시리얼·모델·현재 부팅 ID를 검증합니다. mDNS가 닿지 않으면 포트를 추측하거나
-검색하지 않습니다. OpenMinis가 정상이면 Wi-Fi와 Android 무선 디버깅 화면을 읽기 전용으로
-확인해 현재 연결 포트를 사용하며, 그 경로가 없을 때만 사용자에게 요청합니다.
+검색하지 않습니다. 현재 Shizuku 실행기 출력에 이번 시작 작업의
+`Starting with wireless adb in port PORT...`가 이미 보이면 그 포트를 먼저 사용합니다.
+그렇지 않고 OpenMinis가 정상이면 Wi-Fi와 Android 무선 디버깅 화면을 읽기 전용으로
+확인해 현재 연결 포트를 사용하며, 두 경로가 모두 없을 때만 사용자에게 요청합니다.
+`wireless-connect`는 정확히 `--port CURRENT_CONNECTION_PORT`만 받으며 `--approved`를
+붙이지 않습니다. Shizuku가 이미 `READY`라면 포트를 다시 보려고 Start를 누르지 않습니다.
 
 `steady_adb_enabled=true`인 프로필은 동적 연결을 부트스트랩으로만 사용합니다. 검증된 동적
 포트에서 정확한 고정 프로필로 `5555`를 활성화하고, 등록된 Tailscale `:5555` endpoint로
 다시 연결한 뒤 ADB doctor가 통과해야 최종 준비 상태입니다. 설정이 꺼진 프로필만 검증된
 동적 endpoint를 최종 상태로 사용합니다.
+고정 연결 뒤 기존 동적 endpoint가 `offline`으로 남으면 그 포트만
+`wireless-disconnect --port CURRENT_CONNECTION_PORT`로 제거하고, fixed `connect`와 ADB
+doctor를 다시 실행합니다. 목록에 있다는 사실만으로 `offline` endpoint를 연결 상태로
+판정하지 않습니다.
+최종 목표가 ADB 또는 scrcpy뿐이면 Shizuku는 부트스트랩 지원이며 완료 조건이 아닙니다.
 
 scrcpy doctor는 프로세스나 창을 시작하지 않습니다. `preflight_ready: true`는 ADB 대상,
 scrcpy 설치와 안전 옵션 호환성만 뜻하며 실제 시작 여부는 `launch_verified: false`입니다.
@@ -279,6 +288,7 @@ uv run "$GALAXY_SKILL_ROOT/scripts/oneui_ledger.py" check \
 - 선택 원장이 명세와 같고, 원장 행 수가 선택 수와 같아야 합니다.
 - 이동 성공은 `목표에 있음 + 소스에서 사라짐 + 예상 개수 일치`로 확인합니다.
 - 결과가 애매한 `완료`나 이동은 반복하지 않고 관찰 경로만 바꿉니다.
+- 홈 제스처가 알림창을 열면 HOME으로 돌아가 새 상태를 읽고 반대 방향을 한 번만 시도합니다.
 - 앱 이동 뒤 페이지·좌표·폴더 위치는 다시 읽습니다.
 - 동명 앱 하나만 골라야 한다면 좌표가 아니라 패키지·컴포넌트 증거가 필요합니다.
 
