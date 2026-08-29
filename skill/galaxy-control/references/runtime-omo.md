@@ -22,12 +22,18 @@ Use this canonical skill directly. Do not maintain a second OmO adapter.
 
    The executable enforces the persisted opt-in before any ADB call. The action reuses an existing
    verified transport before mDNS discovery. It never pairs or scans.
-   If it returns `connection_port_required`, use healthy OpenMinis read-only observation to confirm
-   Wi-Fi and read Android Settings → Wireless Debugging → IP address & port. Pass only the current
-   port to `wireless-connect --port`; ask the user only when that read-only path is unavailable.
+   If it returns `connection_port_required`, re-observe the current UI before navigating away. Use
+   a fresh Shizuku launcher line `Starting with wireless adb in port PORT...` when already visible.
+   Otherwise use healthy OpenMinis read-only observation to confirm Wi-Fi and read Android Settings
+   → Wireless Debugging → IP address & port. Run exactly
+   `wireless-connect --port CURRENT_CONNECTION_PORT`; it does not accept `--approved`. Ask the user
+   only when neither read-only path is available. Never infer a hidden row coordinate.
 4. When `steady_adb_enabled: true`, treat the verified dynamic endpoint as bootstrap-only. Run
    `legacy-enable-from-wireless --port CURRENT_CONNECTION_PORT --approved`, then fixed `connect`
    and `galaxy_doctor.py adb`. The final selected endpoint must be the profile's `:5555` endpoint.
+   If the known dynamic endpoint remains locally registered as `offline`, remove only it with
+   `wireless-disconnect --port CURRENT_CONNECTION_PORT`, run fixed `connect` again, and verify ADB
+   again. Endpoint presence without `state: device` is not readiness.
 5. Run `galaxy_screen.py doctor` only after the profile's final ADB state is verified. Treat
    `preflight_ready` as no-launch
    compatibility evidence only; `launch_verified` remains false.
@@ -48,6 +54,10 @@ Use this canonical skill directly. Do not maintain a second OmO adapter.
 10. Read the action adapter's `result.route`. If `result.route.verification_required` is true,
    freshly verify through one of `result.route.verify_with`; prefer a different path when it
    materially improves confidence.
+
+Before pressing Shizuku Start, read `shizuku-status`. Do not restart an already-`READY` server just
+to reveal its port. When the requested end state is ADB or scrcpy only, Shizuku is bootstrap support
+and is not a final completion condition after fixed `:5555` is verified.
 
 | Task shape | Preflight | Adapter |
 | --- | --- | --- |

@@ -80,11 +80,17 @@ an already-paired mDNS service before the explicit connect; that transport is ac
 the same full identity check. The action never pairs, scans, guesses a port, changes Wireless
 Debugging, or enables fixed TCP ADB.
 
-If it returns `connection_port_required` and OpenMinis health plus Accessibility are available,
-inspect Wi-Fi status and open Android's Wireless Debugging settings read-only. Read only the current
-`IP address & port` value and run `wireless-connect --port CURRENT_CONNECTION_PORT`. Never toggle
-Wireless Debugging or tap a pairing control. Ask the user to read the port only when no healthy
-read-only path can inspect it.
+If it returns `connection_port_required`, re-observe the current UI before navigating away. Fresh
+Shizuku launcher output from the user's authorized Start action may already contain
+`Starting with wireless adb in port PORT...`; use that displayed connection port directly. Do not
+press Start merely to reveal a port when `shizuku-status` is already `READY`, because Start can stop
+and restart the existing Shizuku server. Otherwise, when OpenMinis health plus Accessibility are
+available, inspect Wi-Fi status and open Android's Wireless Debugging settings read-only. Read only
+the current `IP address & port` value. In either case, run exactly
+`wireless-connect --port CURRENT_CONNECTION_PORT`; this command does not accept `--approved`.
+Never toggle Wireless Debugging, tap a pairing control, infer a hidden row coordinate, or reuse a
+port observed before a reboot or network change. Ask the user to read the port only when neither
+healthy read-only path can inspect it.
 
 For a profile with `steady_adb_enabled: true`, the verified dynamic endpoint is bootstrap-only.
 Apply the already-approved steady preference, reconnect the enrolled fixed endpoint, and verify it:
@@ -99,6 +105,14 @@ uv run "$GALAXY_SKILL_ROOT/scripts/galaxy_doctor.py" adb
 Do not report ADB readiness for that profile until the selected endpoint is the profile's fixed
 `:5555` endpoint with matching serial, model, and a current boot-session hash. A failed ADB
 preparation must not block a healthy OpenMinis-only task.
+
+If the verified fixed connection leaves the known dynamic endpoint listed as `offline`, remove only
+that endpoint from the Mac ADB server with
+`wireless-disconnect --port CURRENT_CONNECTION_PORT`, run fixed `connect` again, and then rerun the
+ADB doctor. Do not disconnect another endpoint or trust endpoint presence without `state: device`.
+When the requested end state is ADB or scrcpy only, Shizuku is bootstrap support, not a final
+requirement; do not restart it after fixed `:5555` is verified. If the requested task actually uses
+Shizuku, freshly verify `shizuku-status` after every ADB transport change.
 
 After ADB preparation, run the no-launch scrcpy compatibility preflight:
 
@@ -232,6 +246,9 @@ wireless-connect|wireless-disconnect|wireless-recover --port CONNECTION_PORT
 legacy-enable-from-wireless --port CONNECTION_PORT --approved
 enable --approved | restore-usb --approved
 ```
+
+Only command forms that display `--approved` accept it. In particular,
+`wireless-connect --port CONNECTION_PORT --approved` is invalid.
 
 Read [wireless-and-fixed-adb.md](references/wireless-and-fixed-adb.md) before pairing, dynamic-port
 use, fixed TCP ADB, or transport recovery. Fixed TCP ADB is disabled in a new profile until the user

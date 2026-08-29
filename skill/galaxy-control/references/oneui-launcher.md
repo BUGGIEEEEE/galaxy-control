@@ -11,6 +11,9 @@ version-dependent evidence rather than a permanent coordinate map.
 - A single-page drawer still needs a fresh page guard. Do not assume the same guard works across all
   One UI versions until tested.
 - Exclude Edge panels, pop-ups, keyboards, and other overlays from drawer item counts.
+- After a home-to-drawer gesture, prove the destination from a fresh UI observation. If the
+  notification shade opens instead, return HOME, re-observe, and try the opposite direction at most
+  once. Never repeat an unverified gesture or infer a hidden target from neighboring coordinates.
 - After any bulk move, refresh the UI dump. Page count, app positions, folder positions, and visible
   anchors may all change.
 

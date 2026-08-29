@@ -99,6 +99,25 @@ def test_status_labels_connected_remote_transport() -> None:
     assert envelope["result"]["route"]["transport"] == "adb_tcpip"
 
 
+def test_status_does_not_label_offline_steady_endpoint_connected() -> None:
+    # Given
+    runner = FakeRunner(
+        [
+            result(
+                "List of devices attached\n100.64.1.20:5555 offline model:SM_S921B transport_id:2\n"
+            )
+        ]
+    )
+
+    # When
+    envelope, exit_code = execute(("status",), runtime(runner))
+
+    # Then
+    assert exit_code == 0
+    assert envelope["result"]["remote_connected"] is False
+    assert envelope["result"]["devices"][0]["state"] == "offline"
+
+
 def test_disconnect_labels_remote_transport_and_requires_verification() -> None:
     # Given
     runner = FakeRunner([result("disconnected\n")])

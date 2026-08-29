@@ -1,6 +1,6 @@
 [project]
 name = "galaxy-control-distribution"
-version = "0.5.1"
+version = "0.5.2"
 description = "Portable macOS and Samsung Galaxy control skill for Codex"
 readme = "README.md"
 requires-python = ">=3.11"
